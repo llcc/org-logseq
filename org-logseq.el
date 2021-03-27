@@ -124,12 +124,25 @@ The type can be 'url, 'draw and 'page, denoting the path type."
       (insert org-logseq-excalidraw)
       (save-buffer))))
 
+;;;###autoload
+(defun org-logseq-contents-sidebar ()
+  "Display contents.org as sidebar left side."
+  (interactive)
+  (display-buffer-in-side-window
+   (expand-file-name "pages/contents.org" org-logseq-dir)
+   (list (cons 'side 'left)
+         (cons 'window-width 30))))
+
+(defvar org-logseq-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [remap org-open-at-point] 'org-logseq-open-link)
+    (define-key map [remap org-mouse-down-mouse] 'org-logseq-open-link)
+    map)
+  "Org-logseq map")
+
 (define-minor-mode org-logseq-mode
   "Org-logseq minor mode"
-  :init-value nil
-  :keymap (let ((map (make-sparse-keymap)))
-            (define-key map [remap org-open-at-point] 'org-logseq-open-link)
-            map))
+  :init-value nil)
 
 (provide 'org-logseq)
 ;;; org-logseq.el ends here
