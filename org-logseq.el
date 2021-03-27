@@ -27,15 +27,19 @@
 (require 'ol)
 
 (defgroup org-logseq nil
-  "Logseq capbility in Org Mode")
+  "Logseq capbility in Org Mode"
+  :group 'org)
 
 (defcustom org-logseq-dir nil
-  "logseq default path")
+  "Path of logseq notes"
+  :group 'org-logseq)
 
 (defcustom org-logseq-create-page-p nil
-  "Create a new page or not")
+  "Non-nil means Org-logseq creates a new page if it does not exist."
+  :group 'org-logseq)
 
 (defun org-logseq-get-id-at-point ()
+  "Return a cons: \"('id . id)\" at point."
   (save-excursion
     (when-let* ((prev-bracket (search-backward-regexp
                                "((" (line-beginning-position) t)))
@@ -46,6 +50,8 @@
         (cons 'id page-or-id)))))
 
 (defun org-logseq-get-path-at-point ()
+  "Return a cons: \"('type . path)\" at point.
+The type can be 'url, 'draw and 'page, denoting the path type."
   (save-excursion
     (let ((context (org-element-context))
           path)
@@ -58,6 +64,7 @@
               (t (cons 'page path)))))))
 
 (defun org-logseq-grep-query (page-or-id)
+  "Return grep result for searching PAGE-OR-ID in `org-logseq-dir'."
   (let ((type (car page-or-id))
         (query (cdr page-or-id)))
     (format (pcase type
@@ -66,12 +73,15 @@
             query org-logseq-dir)))
 
 (defun org-logseq-create-page (page)
+  "Create a new PAGE org file in pages directory if setting
+ `org-logseq-create-page-p' to non-nil."
   (if org-logseq-create-page-p
       (find-file (expand-file-name (concat "pages/" page) github-dir))
     (user-error "No page found; Check `org-logseq-create-page` variable")))
 
 ;;;###autoload
 (defun org-logseq-open-link ()
+  "Open link at point. Supports url, id and page."
   (interactive)
   (when-let* ((t-l (or (org-logseq-get-path-at-point)
                        (org-logseq-get-id-at-point))))
@@ -99,9 +109,11 @@
     \"gridSize\": null,
     \"viewBackgroundColor\": \"#ffffff\"
   }
-}")
+}"
+  "Blank excalidraw file")
 
 (defun org-logseq-new-excalidraw (&optional name)
+  "Create an excalidraw file and insert it at point."
   (interactive "P")
   (let ((draw-fname (format "%s.excalidraw"
                             (or name (format-time-string "%Y-%m-%d_%H_%M_%S")))))
@@ -120,5 +132,4 @@
             map))
 
 (provide 'org-logseq)
-
 ;;; org-logseq.el ends here
