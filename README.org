@@ -1,0 +1,51 @@
+#+TITLE:Org-logseq
+
+Org-logseq allows you to open [[https://github.com/logseq/logseq][logseq]]-style page and block link along with Org Mode.
+
+* Features
+
+- Open links in logseq-style way in your org document.
+- Open the block id which Org Mode does not support.
+- Create a blank excalidraw file and insert it at point. 
+
+* Installation
+
+Org-logseq requires =grep=. Install it using your system tool at first. 
+
+Org-logseq package is not on MELPA yet. Currently, the easiest way to install org-logseq is through [[https://github.com/quelpa/quelpa][quelpa]] or [[https://github.com/raxod502/straight.el][straight]] system, or use the =:quelpa= or =:straight= keyword by using [[https://github.com/jwiegley/use-package][use-package]]. In order to make =:quelpa= work well with =use-package=, you need to install [[https://github.com/quelpa/quelpa-use-package][quelpa-use-package]]. 
+
+- quelpa
+  #+begin_src emacs-lisp
+  (use-package org-logseq
+    :quelpa (org-logseq :fetcher github :repo "llcc/org-logseq" :files ("*"))
+    :custom (org-logseq-dir "~/logseq"))
+  #+end_src
+
+- straight
+  #+begin_src emacs-lisp :tangle yes
+  (use-package org-logseq
+      :straight (org-logseq :fetcher github :repo "llcc/org-logseq" :files ("*"))
+      :custom (org-logseq-dir "~/logseq"))
+  #+end_src  
+  
+* Getting started
+
+1. Set the variable =org-logseq-dir= to your logseq path.
+2. =M-x org-logseq-mode= in your current buffer, done.
+
+   Creating a directory-local varible in your logseq directory could be the best way to get it worked in all org files.
+   
+   #+begin_src emacs-lisp
+   ((org-mode . ((eval org-logseq-mode 1))))
+   #+end_src
+   
+* Customization
+
+- =org-logseq-create-page-p= ::
+  A booleab value indicating whether or not org-logseq should try to new a page file at point if it does not exist. The varible defaults to =nil=.
+
+  
+* Thanks
+
+All to [[https://github.com/logseq/logseq][logseq]]. 
+
