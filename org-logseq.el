@@ -2,8 +2,8 @@
 
 ;; Author: Zhe Lei <lzhes43@gmail.com>
 ;; URL: https://github.com/llcc/org-logseq
-;; Package-Version: 20210223.840
-;; Version: 0.0.1
+;; Package-Version: 20210327.2210
+;; Version: 0.0.2
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -45,9 +45,9 @@
                                "((" (line-beginning-position) t)))
       (let* ((next-bracket (search-forward-regexp
                             "))" (line-end-position) t))
-             (page-or-id (buffer-substring-no-properties
-                          (+ prev-bracket 2) (- next-bracket 2))))
-        (cons 'id page-or-id)))))
+             (id (buffer-substring-no-properties
+                  (+ prev-bracket 2) (- next-bracket 2))))
+        (cons 'id id)))))
 
 (defun org-logseq-get-path-at-point ()
   "Return a cons: \"('type . path)\" at point.
@@ -77,7 +77,7 @@ The type can be 'url, 'draw and 'page, denoting the path type."
  `org-logseq-create-page-p' to non-nil."
   (if org-logseq-create-page-p
       (find-file (expand-file-name (concat "pages/" page) github-dir))
-    (user-error "No page found; Check `org-logseq-create-page` variable")))
+    (user-error "No page found; Check `org-logseq-create-page-p` variable")))
 
 ;;;###autoload
 (defun org-logseq-open-link ()
@@ -88,13 +88,13 @@ The type can be 'url, 'draw and 'page, denoting the path type."
     (pcase (car t-l)
       ('url (browse-url (cdr t-l)))
       ('draw (org-logseq-open-draw (cdr t-l)))
-      (t (let ((result (shell-command-to-string (org-logseq-grep-query t-l))))
-           (if (string= result "")
-               (org-logseq-create-page (cdr t-l))
-             (let* ((f-n (split-string result ":" nil))
-                    (fname (car f-n))
-                    (lineno (string-to-number (cadr f-n))))
-               (org-open-file fname t lineno))))))))
+      (_ (let ((result (shell-command-to-string (org-logseq-grep-query t-l))))
+          (if (string= result "")
+              (org-logseq-create-page (cdr t-l))
+            (let* ((f-n (split-string result ":" nil))
+                   (fname (car f-n))
+                   (lineno (string-to-number (cadr f-n))))
+              (org-open-file fname t lineno))))))))
 
 ;; todo: looking for a way to open draw file by post
 (defun org-logseq-open-draw nil)
