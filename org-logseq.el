@@ -24,50 +24,70 @@
 
 ;;; Code:
 
-(defgroup org-logseq nil
-  "Logseq capbility in org-mode")
+(require 'ol)
 
-(defcustom org-logseq-dir
-  (expand-file-name "Org-Roam" github-dir)
+(defgroup org-logseq nil
+  "Logseq capbility in Org Mode")
+
+(defcustom org-logseq-dir nil
   "logseq default path")
 
 (defcustom org-logseq-create-page-p nil
   "Create a new page or not")
 
-(defun org-logseq-get-page-or-id-at-point ()
+(defun org-logseq-get-id-at-point ()
   (save-excursion
-    (when-let* ((prev-paren (search-backward-regexp
-                             (regexp-opt '("[[" "((")) (line-beginning-position) t)))
-      (let* ((next-paren (search-forward-regexp
-                          (regexp-opt '("]]" "))")) (line-end-position) t))
+    (when-let* ((prev-bracket (search-backward-regexp
+                               "((" (line-beginning-position) t)))
+      (let* ((next-bracket (search-forward-regexp
+                            "))" (line-end-position) t))
              (page-or-id (buffer-substring-no-properties
-                          (+ prev-paren 2) (- next-paren 2))))
-        (cons (pcase (buffer-substring prev-paren (+ prev-paren 2))
-                ("[[" 'page)
-                ("((" 'id)) page-or-id)))))
+                          (+ prev-bracket 2) (- next-bracket 2))))
+        (cons 'id page-or-id)))))
 
-(defun org-logseq-grep-query (id-or-page)
-  (let ((type (car id-or-page))
-        (search (cdr id-or-page)))
-    (pcase type
-      ('page (format "grep -niR \"^#+\\(TITLE\\): *%s\" \"%s\" --exclude-dir=\".git\"" search org-logseq-dir))
-      ('id (format "grep -niR \"id: *%s\" \"%s\" --exclude-dir=\".git\"" search org-logseq-dir)))))
+(defun org-logseq-get-path-at-point ()
+  (save-excursion
+    (let ((context (org-element-context))
+          path)
+      (when (eq 'link (car context))
+        (setq path (org-element-property :raw-link context))
+        (cond ((string-match "\\(?:https?\\)" path)
+               (cons 'url path))
+              ((string-suffix-p ".excalidraw" path)
+               (cons 'draw path))
+              (t (cons 'page path)))))))
+
+(defun org-logseq-grep-query (page-or-id)
+  (let ((type (car page-or-id))
+        (query (cdr page-or-id)))
+    (format (pcase type
+              ('page "grep -niR \"^#+\\(TITLE\\): *%s\" \"%s\" --exclude-dir=\".git\"" )
+              ('id "grep -niR \"^:id: *%s\" \"%s\" --exclude-dir=\".git\""))
+            query org-logseq-dir)))
 
 (defun org-logseq-create-page (page)
   (if org-logseq-create-page-p
       (find-file (expand-file-name (concat "pages/" page) github-dir))
     (user-error "No page found; Check `org-logseq-create-page` variable")))
 
+;;;###autoload
 (defun org-logseq-open-link ()
   (interactive)
-  (let* ((tal (org-logseq-get-page-or-id-at-point))
-         (results (shell-command-to-string (org-logseq-grep-query tal))))
-    (if (string= results "")
-        (org-logseq-create-page (cdr tal))
-      (let* ((split (split-string results ":" nil))
-             (filename (car split))
-             (lineno (string-to-number (cadr split))))
-        (org-open-file filename t lineno)))))
+  (when-let* ((t-l (or (org-logseq-get-path-at-point)
+                       (org-logseq-get-id-at-point))))
+    (pcase (car t-l)
+      ('url (browse-url (cdr t-l)))
+      ('draw (org-logseq-open-draw (cdr t-l)))
+      (t (let ((result (shell-command-to-string (org-logseq-grep-query t-l))))
+           (if (string= result "")
+               (org-logseq-create-page (cdr t-l))
+             (let* ((f-n (split-string result ":" nil))
+                    (fname (car f-n))
+                    (lineno (string-to-number (cadr f-n))))
+               (org-open-file fname t lineno))))))))
+
+;; todo: looking for a way to open draw file by post
+(defun org-logseq-open-draw nil)
 
 (defvar org-logseq-excalidraw
   "{
