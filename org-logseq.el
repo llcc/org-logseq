@@ -171,21 +171,20 @@ The type can be 'url, 'draw and 'page, denoting the link type."
 (defun org-logseq-toggle-block-ref-overlays ()
   (interactive)
   (setq org-logseq-buffer-modified-p (buffer-modified-p))
-  (save-excursion
-    (if org-logseq-block-ref-overlays
-        (org-logseq-deactivate)
-      (org-logseq-activate)))
+  (if org-logseq-block-ref-overlays
+      (org-logseq-deactivate)
+    (org-logseq-activate))
   (set-buffer-modified-p org-logseq-buffer-modified-p))
 
 (defun org-logseq-activate ()
   (org-logseq-make-block-ref-overlays)
-  (add-hook 'before-save-hook 'org-logseq-create-block-ref-overlays)
-  (add-hook 'after-save-hook 'org-logseq-remove-block-ref-overlays))
+  (add-hook 'before-save-hook 'org-logseq-remove-block-ref-overlays nil t)
+  (add-hook 'after-save-hook 'org-logseq-make-block-ref-overlays nil t))
 
 (defun org-logseq-deactivate ()
   (org-logseq-remove-block-ref-overlays)
-  (add-hook 'before-save-hook 'org-logseq-create-block-ref-overlays)
-  (add-hook 'after-save-hook 'org-logseq-remove-block-ref-overlays))
+  (remove-hook 'before-save-hook 'org-logseq-remove-block-ref-overlays t)
+  (remove-hook 'after-save-hook 'org-logseq-make-block-ref-overlays t))
 
 (defun org-logseq-make-block-ref-overlays (&optional beg end)
   (save-excursion
@@ -240,17 +239,18 @@ The type can be 'url, 'draw and 'page, denoting the link type."
 
 (defun org-logseq-remove-block-ref-overlays ()
   (when org-logseq-block-ref-overlays
-    (dolist (ov org-logseq-block-ref-overlays)
-      (let ((beg (overlay-start ov))
-            (end (overlay-end ov))
-            (block-uuid (overlay-get ov 'block-uuid))
-            (file (overlay-get ov 'file))
-            (inhibit-read-only t))
-        (remove-text-properties beg end '(read-only t))
-        (delete-region beg end)
-        (delete-overlay ov)
-        (goto-char beg)
-        (insert (concat "((" block-uuid "))") )))
+    (save-excursion
+      (dolist (ov org-logseq-block-ref-overlays)
+        (let ((beg (overlay-start ov))
+              (end (overlay-end ov))
+              (block-uuid (overlay-get ov 'block-uuid))
+              (file (overlay-get ov 'file))
+              (inhibit-read-only t))
+          (remove-text-properties beg end '(read-only t))
+          (delete-region beg end)
+          (delete-overlay ov)
+          (goto-char beg)
+          (insert (concat "((" block-uuid "))") ))))
     (setq org-logseq-block-ref-overlays nil)))
 
 (defvar org-logseq-map
