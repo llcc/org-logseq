@@ -256,13 +256,13 @@ The type can be 'url, 'draw and 'page, denoting the link type."
 (defvar org-logseq-map
   (let ((map (make-sparse-keymap)))
     (define-key map [remap org-open-at-point] 'org-logseq-open-link)
-    (define-key map [remap org-mouse-down-mouse] 'org-logseq-open-link)
     map)
   "Org-logseq map")
 
 (define-minor-mode org-logseq-mode
   "Org-logseq minor mode"
   :init-value nil
+  :global nil
   :keymap org-logseq-map)
 
 (provide 'org-logseq)
