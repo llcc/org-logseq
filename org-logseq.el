@@ -38,7 +38,7 @@
   "Non-nil means new a page if not exist."
   :group 'org-logseq)
 
-(defun org-logseq-get-id (&optional beg end embed)
+(defun org-logseq-get-block-id (&optional beg end embed)
   "Return a cons: \"('id . id)\" at point."
   (save-excursion
     (when-let* ((prev-bracket (or beg (search-backward-regexp
@@ -76,7 +76,7 @@ The type can be 'url, 'draw and 'page, denoting the link type."
   "Open link at point. Supports url, id and page."
   (interactive)
   (when-let* ((t-l (or (org-logseq-get-link)
-                       (org-logseq-get-id))))
+                       (org-logseq-get-block-id))))
     (let ((type (car t-l))
           (link (cdr t-l)))
       (pcase type
@@ -170,38 +170,41 @@ The type can be 'url, 'draw and 'page, denoting the link type."
 
 (defun org-logseq-toggle-block-ref-overlays ()
   (interactive)
-  (setq org-logseq-buffer-modified-p (buffer-modified-p))
   (if org-logseq-block-ref-overlays
       (org-logseq-deactivate)
-    (org-logseq-activate))
-  (set-buffer-modified-p org-logseq-buffer-modified-p))
+    (org-logseq-activate)))
 
 (defun org-logseq-activate ()
   (org-logseq-make-block-ref-overlays)
   (add-hook 'before-save-hook 'org-logseq-remove-block-ref-overlays nil t)
-  (add-hook 'after-save-hook 'org-logseq-make-block-ref-overlays nil t))
+  (add-hook 'after-save-hook 'org-logseq-make-block-ref-overlays nil t)
+  (add-hook 'kill-buffer-hook 'org-logseq-remove-block-ref-overlays t))
 
 (defun org-logseq-deactivate ()
   (org-logseq-remove-block-ref-overlays)
   (remove-hook 'before-save-hook 'org-logseq-remove-block-ref-overlays t)
-  (remove-hook 'after-save-hook 'org-logseq-make-block-ref-overlays t))
+  (remove-hook 'after-save-hook 'org-logseq-make-block-ref-overlays t)
+  (remove-hook 'kill-buffer-hook 'org-logseq-remove-block-ref-overlays t))
 
 (defun org-logseq-make-block-ref-overlays (&optional beg end)
+  (setq org-logseq-buffer-modified-p (buffer-modified-p))
   (save-excursion
     (goto-char (or beg (point-min)))
     (while (re-search-forward org-logseq-block-ref-re end t)
       (let ((overlay-end (point))
             (overlay-beg (re-search-backward "((" (line-beginning-position) t)))
-        (org-logseq-create-block-ref-overlay overlay-beg overlay-end)))))
+        (org-logseq-create-block-ref-overlay overlay-beg overlay-end))))
+  (set-buffer-modified-p org-logseq-buffer-modified-p))
 
 (defun org-logseq-create-block-ref-overlay (beg end)
-  (let* ((tuuid (org-logseq-get-id beg end))
+  (let* ((tuuid (org-logseq-get-block-id beg end))
          (src-fh (org-logseq-get-block-ref-heading tuuid))
          (file (car src-fh))
-         (heading (let ((result (cdr src-fh)))
-                    (dolist (func org-logseq-block-ref-heading-hook) 
-                      (setq result (funcall func result)))
-                    result)))
+         (raw-heading (let ((result (cdr src-fh)))
+                        (dolist (func org-logseq-block-ref-heading-hook) 
+                          (setq result (funcall func result)))
+                        result))
+         (heading (format "[[id:%s][%s]]" (cdr tuuid) raw-heading)))
     (delete-region beg end)
     (insert heading)
     (let* ((end (point))
@@ -238,6 +241,7 @@ The type can be 'url, 'draw and 'page, denoting the link type."
   "Hook for cleaning up id heading")
 
 (defun org-logseq-remove-block-ref-overlays ()
+  (setq org-logseq-buffer-modified-p (buffer-modified-p))
   (when org-logseq-block-ref-overlays
     (save-excursion
       (dolist (ov org-logseq-block-ref-overlays)
@@ -251,7 +255,8 @@ The type can be 'url, 'draw and 'page, denoting the link type."
           (delete-overlay ov)
           (goto-char beg)
           (insert (concat "((" block-uuid "))") ))))
-    (setq org-logseq-block-ref-overlays nil)))
+    (setq org-logseq-block-ref-overlays nil))
+  (set-buffer-modified-p org-logseq-buffer-modified-p))
 
 (defvar org-logseq-map
   (let ((map (make-sparse-keymap)))
