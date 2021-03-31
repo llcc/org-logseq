@@ -6,7 +6,9 @@ Org-logseq allows you to open [[https://github.com/logseq/logseq][logseq]]-style
 
 - Open links in logseq-style way in your org document.
 - Open the block id which Org Mode does not support.
-- Create a blank excalidraw file and insert it at point. 
+- Create a blank excalidraw file and insert it at point.
+- Display logseq block reference as org-alink overlay, which defaults to block heading title. 
+  ((605cf1e6-31d0-4512-a8bf-41c7cd22aeba)) -> [[id:605cf1e6-31d0-4512-a8bf-41c7cd22aeba]] to enable jump.
 
 * Installation
 
