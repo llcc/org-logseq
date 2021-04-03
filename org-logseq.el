@@ -35,7 +35,7 @@
   :group 'org-logseq)
 
 (defcustom org-logseq-new-page-p nil
-  "Non-nil means new a page if not exist."
+  "Non-nil means creating a page if not exist."
   :group 'org-logseq)
 
 (defun org-logseq-get-block-id (&optional beg end embed)
@@ -213,11 +213,22 @@ The type can be 'url, 'draw and 'page, denoting the link type."
           (org-logseq-create-block-ref-overlay overlay-beg overlay-end file-type-block)))))
   (set-buffer-modified-p org-logseq-buffer-modified-p))
 
+(defun org-logseq-prepare-embed-content (content)
+  (let* ((content-list (split-string content "\n"))
+         (heading (car content-list))
+         (lines (cdr content-list)))
+    (concat  "​" heading "\n"
+             (mapconcat (lambda (str)
+                          (concat "  " str))
+                        lines "\n"))))
+
 (defun org-logseq-create-block-ref-overlay (beg end file-type-block)
   (pcase-let ((`((,file . ,uuid) . (,type . ,content))
                file-type-block))
     (delete-region beg end)
-    (insert content)
+    (pcase type
+      ('ref (insert content))
+      ('embed (insert (org-logseq-prepare-embed-content content))))
     (let* ((end (point))
            (ov (make-overlay beg end))
            (face (pcase type
@@ -231,7 +242,7 @@ The type can be 'url, 'draw and 'page, denoting the link type."
       (overlay-put ov 'help-echo
                    (format "Original page: %s.org" (file-name-base file)))
       (overlay-put ov 'face face)
-      (add-text-properties beg end '(read-only t))
+      ;; (add-text-properties beg end '(read-only t))
       (pcase type
         ('ref (push ov org-logseq-block-ref-overlays))
         ('embed (push ov org-logseq-block-embed-overlays))))))
@@ -254,7 +265,7 @@ The type can be 'url, 'draw and 'page, denoting the link type."
                                       result)))
                       ('embed 
                        (org-narrow-to-subtree)
-                       (buffer-substring (point-min) (point-max))))))))))
+                       (buffer-substring-no-properties (point-min) (point-max))))))))))
 
 (defun olih-link (heading)
   (if (string-match "\\[\\[.+\\]\\[\\(.+\\)\\]\\]" heading)
