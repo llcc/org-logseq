@@ -486,5 +486,20 @@ object (e.g., within a comment).  In these case, you need to use
       (org-logseq-activate)
     (org-logseq-deactivate)))
 
+(defun org-logseq-download-images ()
+  (interactive)
+  (save-excursion
+    (goto-char (point-min))
+    (while (re-search-forward "https://cdn.logseq.com" nil t)
+      (let* ((context (org-element-context)))
+        (when (eq (car context) 'link)
+          (let ((link-begin (org-element-property :begin context))
+                (link-end (org-element-property :end context))
+                (path (org-element-property :raw-link context))
+                (image-path (concat "images/"
+                                    (make-temp-name "org-logseq-") (format-time-string "-%Y%m%d.png"))))
+            (start-process "org logseq" nil "curl" path "--output" image-path)
+            (setf (buffer-substring link-begin link-end) (format "[[./%s]]" image-path))))))))
+
 (provide 'org-logseq)
 ;;; org-logseq.el ends here

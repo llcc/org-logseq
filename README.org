@@ -11,6 +11,7 @@ Org-logseq supports to open [[https://github.com/logseq/logseq][logseq]]-style l
 + Display logseq block references in buffer as overlays:
   - =((6064f6c6-440a-46ca-b8df-59131adab5a1))= to =[[id:6064f6c6-440a-46ca-b8df-59131adab5a1][Block heading]]=
   - ={{embed  ((6064f6c6-440a-46ca-b8df-59131adab5a1))}}= to the content of the referred block.
++ Download images stored in the logseq server to local.
 
 * Installation
 
