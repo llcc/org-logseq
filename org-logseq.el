@@ -85,14 +85,14 @@ The type can be 'url, 'draw and 'page, denoting the link type."
         (_ (let ((result (shell-command-to-string
                           (org-logseq-grep-query t-l))))
              (when (string-prefix-p "grep" result)
-               (error "grep searching error" )
-               (if (string= result "")
-                   (org-logseq-new-page link)
-                 (let* ((f-n (split-string result ":" nil))
-                        (fname (car f-n))
-                        (lineno (string-to-number (cadr f-n))))
-                   (delete-other-windows)
-                   (org-open-file fname t lineno))))))))))
+               (error "grep searching error" ))
+             (if (string= result "")
+                 (org-logseq-new-page link)
+               (let* ((f-n (split-string result ":" nil))
+                      (fname (car f-n))
+                      (lineno (string-to-number (cadr f-n))))
+                 (delete-other-windows)
+                 (org-open-file fname t lineno)))))))))
 
 (defun org-logseq-new-page (page)
   "Create a new PAGE org file in pages directory if setting
