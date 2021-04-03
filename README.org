@@ -1,14 +1,16 @@
 #+TITLE:Org-logseq
 
-Org-logseq allows you to open [[https://github.com/logseq/logseq][logseq]]-style page and block link along with Org Mode.
+Org-logseq supports to open [[https://github.com/logseq/logseq][logseq]]-style link (page or block reference), transclusion of referred and embedded blocks using overlays, along with Org-Mode.
 
 * Features
 
-- Open links in logseq-style way in your org document.
-- Open the block id which Org Mode does not support.
-- Create a blank excalidraw file and insert it at point.
-- Display logseq block reference as org-alink overlay, which defaults to block heading title. 
-  ((605cf1e6-31d0-4512-a8bf-41c7cd22aeba)) -> [[id:605cf1e6-31d0-4512-a8bf-41c7cd22aeba]] to enable jump.
++ Open logseq-style links by native Org-Mode binding (=C-c C-o=, =Enter=, etc). Org-logseq supports:
+  - Page link: =[[a logseq page]]=
+  - Block reference: =((6064f6c6-440a-46ca-b8df-59131adab5a1))=
++ Create a blank excalidraw file if necessary, while inserting it at point.
++ Display logseq block references in buffer as overlays:
+  - =((6064f6c6-440a-46ca-b8df-59131adab5a1))= to =[[id:6064f6c6-440a-46ca-b8df-59131adab5a1][Block heading]]=
+  - ={{embed  ((6064f6c6-440a-46ca-b8df-59131adab5a1))}}= to the content of the referred block.
 
 * Installation
 
@@ -34,18 +36,22 @@ Org-logseq package is not on MELPA yet. Currently, the easiest way to install or
 
 1. Set the variable =org-logseq-dir= to your logseq path.
 2. =M-x org-logseq-mode= in your current buffer.
-3. =C-c C-o= to open pages or block references. 
-
    Creating a directory-local varible in your logseq directory could be the best way to get it worked in all org files.
    
    #+begin_src emacs-lisp
    ((org-mode . ((eval org-logseq-mode 1))))
    #+end_src
    
+3. Use your native Org-mode bindings to open pages or block references.
+   
 * Customization
 
 - =org-logseq-create-page-p= ::
-  A booleab value indicating whether or not org-logseq should try to new a page file at point if it does not exist. The varible defaults to =nil=.
+  A boolean value indicating whether or not org-logseq should try to new a page file at point if it does not exist. The varible defaults to =nil=.
+- *org-logseq-block-ref-overlay-p* ::
+  A boolean value indicating whether or not to display the overlays of =block references= when initializing the Org-Mode buffer. 
+- *org-logseq-block-embed-overlay-p* ::
+  A boolean value indicating whether or not to display the overlays of =block embed= when initializing the Org-Mode buffer. 
 
   
 * Thanks
