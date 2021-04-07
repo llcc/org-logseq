@@ -81,6 +81,15 @@ The type can be 'url, 'draw and 'page, denoting the link type."
   (let ((type (car page-or-id))
         (query (cdr page-or-id)))
     (format (pcase type
+              ('page "grep -niR \"^#+\\(TITLE\\|ALIAS\\): *%s\" %s --exclude-dir=.git" )
+              ('id "grep -niR \":id: *%s\" %s --exclude-dir=.git"))
+            query (shell-quote-argument org-logseq-dir))))
+
+(defun org-logseq-grep-query (page-or-id)
+  "Return grep result for searching PAGE-OR-ID in `org-logseq-dir'."
+  (let ((type (car page-or-id))
+        (query (cdr page-or-id)))
+    (format (pcase type
               ('page "grep -niR \"^#+\\(TITLE\\|ALIAS\\): *%s\" \"%s\" --exclude-dir=\".git\"" )
               ('id "grep -niR \":id: *%s\" \"%s\" --exclude-dir=\".git\""))
             query org-logseq-dir)))
