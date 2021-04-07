@@ -3,7 +3,9 @@
 ;; Author: Zhe Lei <lzhes43@gmail.com>
 ;; URL: https://github.com/llcc/org-logseq
 ;; Package-Version: 20210402.2237
-;; Version: 0.0.3
+;; Version: 0.0.4
+;; Package-Requires: ((dash "2.11.0") (org "9.0.0"))
+
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -79,7 +81,7 @@ The type can be 'url, 'draw and 'page, denoting the link type."
   (let ((type (car page-or-id))
         (query (cdr page-or-id)))
     (format (pcase type
-              ('page "grep -niR \"^#+\\(TITLE\\): *%s\" \"%s\" --exclude-dir=\".git\"" )
+              ('page "grep -niR \"^#+\\(TITLE\\|ALIAS\\): *%s\" \"%s\" --exclude-dir=\".git\"" )
               ('id "grep -niR \":id: *%s\" \"%s\" --exclude-dir=\".git\""))
             query org-logseq-dir)))
 
@@ -90,7 +92,8 @@ The type can be 'url, 'draw and 'page, denoting the link type."
 
 ;;;###autoload
 (defun org-logseq-open-link ()
-  "Open link at point. Supports url, id and page."
+  "Open link at point. Supports url, id and page.
+or Block Ref or Embed overlays."
   (interactive)
   (when-let* ((t-l (or (org-logseq-get-block-ref-or-embed-link)
                        (org-logseq-get-link)
@@ -109,7 +112,6 @@ The type can be 'url, 'draw and 'page, denoting the link type."
                (let* ((f-n (split-string result ":" nil))
                       (fname (car f-n))
                       (lineno (string-to-number (cadr f-n))))
-                 (delete-other-windows)
                  (org-open-file fname t lineno)))))))))
 
 (defun org-logseq-new-page (page)
@@ -150,20 +152,29 @@ The type can be 'url, 'draw and 'page, denoting the link type."
       (save-buffer))))
 
 ;;; Contents sidebar
-(defcustom org-logseq-sidebar-width 25
+(defcustom org-logseq-sidebar-width 30
   "Sidebar window width")
 
 (defcustom org-logseq-sidebar-side 'left
   "Sidebar position")
 
 ;;;###autoload
-(defun org-logseq-contents-sidebar ()
+(defun org-logseq-toggle-contents-sidebar ()
   "Display contents.org as sidebar left side."
   (interactive)
-  (display-buffer-in-side-window
-   (find-file (expand-file-name "pages/contents.org" org-logseq-dir))
-   (list (cons 'side org-logseq-sidebar-side)
-         (cons 'window-width org-logseq-sidebar-width))))
+  (if-let ((contents-window
+            (--first
+             (and (string= "contents.org" (buffer-name (window-buffer it)))
+                  (window-dedicated-p it))
+             (window-list (selected-frame)))))
+      (delete-window contents-window)
+    (let ((window-parameters (list (cons 'no-other-window t)
+                                   (cons 'no-delete-other-windows t))))
+      (display-buffer-in-side-window
+       (find-file-noselect (expand-file-name "pages/contents.org" org-logseq-dir))
+       (list (cons 'side org-logseq-sidebar-side)
+             (cons 'window-width org-logseq-sidebar-width)
+             (cons 'window-parameters window-parameters))))))
 
 ;;; Logseq id overlays
 (defvar-local org-logseq-block-ref-overlays nil)
@@ -189,12 +200,14 @@ The type can be 'url, 'draw and 'page, denoting the link type."
   "Face for embed block."
   :group 'org-logseq)
 
+;;;###autoload
 (defun org-logseq-toggle-block-ref-overlays ()
   (interactive)
   (if org-logseq-block-ref-overlays
       (org-logseq-block-ref-deactivate)
     (org-logseq-block-ref-activate)))
 
+;;;###autoload
 (defun org-logseq-toggle-block-embed-overlays ()
   (interactive)
   (if org-logseq-block-embed-overlays
@@ -206,17 +219,11 @@ The type can be 'url, 'draw and 'page, denoting the link type."
 (defun org-logseq--remove-block-ref-overlays ()
   (org-logseq-remove-block-overlays 'ref))
 
-(defun org-logseq--make-block-embed-overlays ()
-  (org-logseq-make-block-overlays 'embed))
-(defun org-logseq--remove-block-embed-overlays ()
-  (org-logseq-remove-block-overlays 'embed))
-
 (defun org-logseq-block-ref-activate ()
   (org-logseq--make-block-ref-overlays)
   (add-hook 'before-save-hook #'org-logseq--remove-block-ref-overlays nil t)
   (add-hook 'after-save-hook #'org-logseq--make-block-ref-overlays nil t)
   (add-hook 'kill-buffer-hook #'org-logseq--remove-block-ref-overlays nil t))
-
 (defun org-logseq-block-ref-deactivate ()
   (org-logseq--remove-block-ref-overlays)
   (remove-hook 'before-save-hook #'org-logseq--remove-block-ref-overlays t)
@@ -227,11 +234,15 @@ The type can be 'url, 'draw and 'page, denoting the link type."
           #'(lambda () (when org-logseq-block-ref-overlay-p
                          (org-logseq-block-ref-activate))))
 
+(defun org-logseq--make-block-embed-overlays ()
+  (org-logseq-make-block-overlays 'embed))
+(defun org-logseq--remove-block-embed-overlays ()
+  (org-logseq-remove-block-overlays 'embed))
+
 (defun org-logseq-block-embed-activate ()
   (org-logseq--make-block-embed-overlays)
   (add-hook 'before-save-hook #'org-logseq--remove-block-embed-overlays nil t)
   (add-hook 'after-save-hook #'org-logseq--make-block-embed-overlays nil t))
-
 (defun org-logseq-block-embed-deactivate ()
   (org-logseq--remove-block-embed-overlays)
   (remove-hook 'before-save-hook #'org-logseq--remove-block-embed-overlays t)
@@ -278,7 +289,7 @@ The type can be 'url, 'draw and 'page, denoting the link type."
             "\n")))
 
 (defun org-logseq-hide-block-embed-drawer-all (beg end)
-  "Fold all drawers in the current buffer."
+  "Fold all drawers in the block embed overlays."
   (save-excursion
     (goto-char beg)
     (while (re-search-forward org-drawer-regexp end t)
@@ -486,6 +497,7 @@ object (e.g., within a comment).  In these case, you need to use
       (org-logseq-activate)
     (org-logseq-deactivate)))
 
+;;;###autoload
 (defun org-logseq-download-images ()
   (interactive)
   (save-excursion
