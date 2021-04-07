@@ -61,8 +61,8 @@ Org-logseq package is not on MELPA yet. Currently, the easiest way to install or
 * Changelog
 
 ** <2021-04-08 Thu>
-- Add a `org-logseq-toggle-contents-sidebar` command, to toggle your `contents.org` as a sidebar.
-- Fix path quote bug in macOS, [[https://github.com/llcc/org-logseq/issues/1]]
+- Add a =org-logseq-toggle-contents-sidebar= command, to toggle your =contents.org= as a sidebar.
+- Fix path quote bug in macOS, [[https://github.com/llcc/org-logseq/issues/1][#issue1]]
    
 * Thanks
 
