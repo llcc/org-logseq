@@ -7,11 +7,14 @@ Org-logseq supports to open [[https://github.com/logseq/logseq][logseq]]-style l
 + Open logseq-style links by native Org-Mode binding (=C-c C-o=, =Enter=, etc). Org-logseq supports:
   - Page link: =[[a logseq page]]=
   - Block reference: =((6064f6c6-440a-46ca-b8df-59131adab5a1))=
+  - Block Embed and Reference overlays.
 + Create a blank excalidraw file if necessary, while inserting it at point.
 + Display logseq block references in buffer as overlays:
   - =((6064f6c6-440a-46ca-b8df-59131adab5a1))= to =[[id:6064f6c6-440a-46ca-b8df-59131adab5a1][Block heading]]=
   - ={{embed  ((6064f6c6-440a-46ca-b8df-59131adab5a1))}}= to the content of the referred block.
 + Download images stored in the logseq server to local.
+  `curl` needs to be installed first.
++ Toggle `contents.org` as a sidebar.
 
 * Installation
 
@@ -55,6 +58,12 @@ Org-logseq package is not on MELPA yet. Currently, the easiest way to install or
   A boolean value indicating whether or not to display the overlays of =block embed= when initializing the Org-Mode buffer. 
 
   
+* Changelog
+
+** <2021-04-08 Thu>
+- Add a `org-logseq-toggle-contents-sidebar` command, to toggle your `contents.org` as a sidebar.
+- Fix path quote bug in macOS, [[https://github.com/llcc/org-logseq/issues/1]]
+   
 * Thanks
 
 All to [[https://github.com/logseq/logseq][logseq]]. 
