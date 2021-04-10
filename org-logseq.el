@@ -85,15 +85,6 @@ The type can be 'url, 'draw and 'page, denoting the link type."
               ('id "grep -niR \":id: *%s\" %s --exclude-dir=.git"))
             query (shell-quote-argument org-logseq-dir))))
 
-(defun org-logseq-grep-query (page-or-id)
-  "Return grep result for searching PAGE-OR-ID in `org-logseq-dir'."
-  (let ((type (car page-or-id))
-        (query (cdr page-or-id)))
-    (format (pcase type
-              ('page "grep -niR \"^#+\\(TITLE\\|ALIAS\\): *%s\" \"%s\" --exclude-dir=\".git\"" )
-              ('id "grep -niR \":id: *%s\" \"%s\" --exclude-dir=\".git\""))
-            query org-logseq-dir)))
-
 (defun org-logseq-get-block-ref-or-embed-link ()
   (when-let ((ovs (overlays-at (point)))
              (ov (--first (eq (overlay-get it 'parent) 'block) ovs)))
@@ -498,13 +489,23 @@ object (e.g., within a comment).  In these case, you need to use
   (advice-remove 'org-open-at-point #'org-logseq-open-link)
   (advice-remove 'org-open-at-mouse #'org-logseq-open-link))
 
+(defvar org-logseq-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [remap org-return] 'org-logseq-return)
+    (define-key map [remap org-open-at-point] 'org-logseq-open-link)
+    (define-key map [remap org-open-at-mouse] 'org-logseq-open-link)
+    map)
+  "Org-logseq map")
+
 (define-minor-mode org-logseq-mode
   "Org-logseq minor mode"
   :init-value nil
   :global nil
-  (if org-logseq-mode
-      (org-logseq-activate)
-    (org-logseq-deactivate)))
+  :keymap org-logseq-map)
+
+;; (if org-logseq-mode
+;;     (org-logseq-activate)
+;;   (org-logseq-deactivate))
 
 ;;;###autoload
 (defun org-logseq-download-images ()
