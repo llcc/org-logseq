@@ -81,8 +81,8 @@ The type can be 'url, 'draw and 'page, denoting the link type."
   (let ((type (car page-or-id))
         (query (cdr page-or-id)))
     (format (pcase type
-              ('page "grep -niR \"^#+\\(TITLE\\|ALIAS\\): *%s\" %s --exclude-dir=.git" )
-              ('id "grep -niR \":id: *%s\" %s --exclude-dir=.git"))
+              ('page "grep -niR \"^#+\\(TITLE\\|ALIAS\\): *%s\" %s --exclude-dir={.git,logseq}" )
+              ('id "grep -niR \":id: *%s\" %s --exclude-dir={.git,logseq}"))
             query (shell-quote-argument org-logseq-dir))))
 
 (defun org-logseq-get-block-ref-or-embed-link ()
