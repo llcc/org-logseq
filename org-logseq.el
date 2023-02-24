@@ -28,14 +28,16 @@
 
 (require 'ol)
 (require 'org-element)
-(require 'dash)
+;; TODO require not found problem
+(require 'evil)
+(require 'ov)
 
 (defgroup org-logseq nil
-  "Logseq capbility in Org Mode"
+  "Logseq capbility in Org Mode."
   :group 'org)
 
 (defcustom org-logseq-dir nil
-  "Path of logseq notes"
+  "Path of logseq notes."
   :group 'org-logseq)
 
 (defcustom org-logseq-new-page-p nil
@@ -43,485 +45,456 @@
   :group 'org-logseq)
 
 (defcustom org-logseq-block-ref-overlay-p nil
-  "Non-nil means to enable block ref by default"
+  "Non-nil means to enable block ref by default."
   :group 'org-logseq)
 (make-variable-buffer-local 'org-logseq-block-ref-overlay-p)
 
 (defcustom org-logseq-block-embed-overlay-p nil
-  "Non-nil means to enable block ref by default"
+  "Non-nil means to enable block ref by default."
   :group 'org-logseq)
 (make-variable-buffer-local 'org-logseq-block-embed-overlay-p)
 
-(defun org-logseq-get-block-id (&optional beg end embed)
+
+;; deprecate
+(defun org-logseq-grep-query (page-or-id)
+  "Return grep result for searching PAGE-OR-ID in `org-logseq-dir'."
+  (let ((type (car page-or-id))
+        (query (cdr page-or-id)))
+    (format (pcase type
+              ('page "rg -ni --no-heading -m 1 --type org -g '!.git' -g '!logseq' -g '!assets' '^#\\+(TITLE|ALIAS): *%s$' %s" )
+              ('id "rg -ni --no-heading -m 1 --type org -g '!.git' -g '!logseq'  -g '!assets' ':id: *%s' %s"))
+            query (shell-quote-argument org-logseq-dir))))
+
+;; deprecate
+(defun org-logseq-open-file-at-line-number (file-name line-number)
+  "Open the given logseq file at LINE-NUMBER.
+if the FILE-NAME is current buffer, jump to the line."
+  (if (string-equal file-name (buffer-file-name))
+      (progn
+        (org-goto-line line-number)
+        (when (equal (line-number-at-pos) line-number)
+          (evil-open-fold)
+          (org-goto-line line-number)))
+    (org-open-file file-name t line-number))
+  (evil-close-fold)
+  (org-fold-show-children))
+
+
+(defun is-uuid (s)
+  "Return non-nil if S is a uuid, otherwise nil."
+  ((lambda(s)(and(eq(string-bytes s)36)(let((l(string-to-list s))(i 0)(h '(8 13 18 23))(v t))(dolist(c l v)(set'v(and v(if(member i h)(and v(eq c 45))(or(and(> c 47)(< c 58))(and(> c 64)(< c 91))(and(> c 96)(< c 123))))))(set'i(+ i 1)))))) s))
+
+(defun org-logseq-get-begin-value (key)
+  "Get begin #+KEY:value of org."
+  (cadar (org-collect-keywords (list key))))
+
+(defun org-logseq-set-begin-value (key value)
+  "Set the value of the first occurence of #+KEY: VALUE add it at the beginning of file if there is none."
+  (let* ((key (concat "#+" key ": "))
+        (new-key-value (concat key value)))
+    (save-excursion
+      (goto-char (point-min))
+      (if (re-search-forward
+          (concat (regexp-quote key) "\.\*\$") nil t)
+          (replace-match new-key-value nil nil)
+        (insert (concat new-key-value "\n"))))))
+
+(defun org-logseq-get-block-id ()
   "Return a cons: \"('id . id)\" at point."
   (save-excursion
-    (when-let* ((prev-bracket (or beg (search-backward-regexp
-                                       "((" (line-beginning-position) t))))
-      (let* ((next-bracket (or end (search-forward-regexp
-                                    "))" (line-end-position) t)))
+    (when-let* ((prev-bracket (search-backward-regexp "((" (line-beginning-position) t)))
+      (let* ((next-bracket (search-forward-regexp "))" (line-end-position) t))
              (id (buffer-substring-no-properties
                   (+ prev-bracket 2) (- next-bracket 2))))
         (cons 'id id)))))
 
 (defun org-logseq-get-link ()
-  "Return a cons: \"('type . link)\" at point.
-The type can be 'url, 'draw and 'page, denoting the link type."
+  "Return a cons: \"('type . link)\" at point. The type can be 'url, 'page, denoting the link type."
   (save-excursion
     (let ((context (org-element-context)) link)
       (when (eq 'link (car context))
         (setq link (org-element-property :raw-link context))
         (cond ((string-match "\\(?:https?\\)" link)
                (cons 'url link))
-              ((string-suffix-p ".excalidraw" link)
-               (cons 'draw link))
               (t (cons 'page link)))))))
 
-(defun org-logseq-grep-query (page-or-id)
-  "Return grep result for searching PAGE-OR-ID in `org-logseq-dir'."
-  (let ((type (car page-or-id))
-        (query (cdr page-or-id)))
-    (format (pcase type
-              ('page "grep -niR \"^#+\\(TITLE\\|ALIAS\\): *%s$\" %s --exclude-dir={.git,logseq}" )
-              ('id "grep -niR \":id: *%s\" %s --exclude-dir={.git,logseq}"))
-            query (shell-quote-argument org-logseq-dir))))
+(defun org-logseq-get-block-ref-from-overlay ()
+  "Return \"('id . uuid)\" if point is a overlay created by org-logseq."
+  (when-let ((ov (ov-at (point)))
+             (create-by-org-logseq-flag (eq (ov-val ov 'parent) 'block)))
+    (cons 'overlay (ov-val ov 'block-uuid))))
 
-(defun org-logseq-get-block-ref-or-embed-link ()
-  (when-let ((ovs (overlays-at (point)))
-             (ov (--first (eq (overlay-get it 'parent) 'block) ovs)))
-    (cons 'id (overlay-get ov 'block-uuid))))
+(defun org-logseq-get-file-name-from-title (title-name)
+  "Return file name with path by the TITLE-NAME."
+  (if (string-match (rx string-start (= 3 alpha) ", " (group (= 4 digit)) "/"
+                        (group (= 2 digit)) "/" (group (= 2 digit)) string-end) title-name)
+      (expand-file-name (concat "journals/"
+                                (match-string 1 title-name) "_"
+                                (match-string 2 title-name) "_"
+                                (match-string 3 title-name) ".org")
+                        org-logseq-dir)
+    (expand-file-name (concat
+                       "pages/" (string-replace "/" "___" title-name) ".org")
+                      org-logseq-dir)))
+
+(defun org-logseq-open-page-inside (title)
+  "Open logseq by TITLE inside Emacs."
+  (let (file-name)
+    (if (string-match (rx string-start (= 3 alpha) ", " (group (= 4 digit)) "/"
+                          (group (= 2 digit)) "/" (group (= 2 digit)) string-end) title)
+        (setq file-name (concat "journals/" (match-string 1 title) "_"
+                                (match-string 2 title) "_" (match-string 3 title)
+                                ".org"))
+      (setq file-name (concat "pages/" (string-replace "/" "___" title) ".org")))
+    (setq file-name (expand-file-name file-name org-logseq-dir))
+    (if (file-exists-p file-name)
+        (org-open-file file-name t)
+      (org-logseq-create-new-page title))
+    ))
+
+(defun org-logseq-update-id-locations ()
+  "Update id locations in logseq directories."
+  (org-id-update-id-locations
+   (append
+    (directory-files (expand-file-name "journals" org-logseq-dir) t ".*org")
+    (directory-files (expand-file-name "pages" org-logseq-dir) t ".*org"))))
+
+(defun org-logseq-find-id-file (id)
+  "Find ID location by 'org-id-find-id-file'.
+If can't find update the id locations and try again."
+  (let ((file-name (file-truename (org-id-find-id-file id))))
+    (if file-name
+        file-name
+      (progn
+        (message "Not found id, update the id locations.")
+        (org-logseq-update-id-locations)
+        (setq file-name (file-truename (org-id-find-id-file id)))
+        (if file-name
+            file-name
+          (user-error "Can not find id: \"%s\"" id))))))
+
+(defun org-logseq-goto-id (id)
+  "Goto ID."
+  (let ((file-name (org-logseq-find-id-file id)))
+    (if (not (string-equal (buffer-file-name) file-name))
+        (find-file-other-window file-name))
+    (org-id-goto id)
+    (org-fold-hide-subtree)
+    (org-show-children)))
+
+(defun org-logseq-open-external (title-or-id)
+  "Change logseq page through xdg-open by TITLE-OR-ID.
+But not change the keyboard focus.
+In order to use this function, you need to manually open logseq in advance."
+  (shell-command
+   (concat "xdg-open \"logseq://graph/Logseq_notes?" title-or-id "\""))
+  (shell-command
+   (concat "xdotool search --name \"" (shell-quote-argument (frame-parameter nil 'name))
+           "\" windowactivate %1"))
+  ;; (call-process-shell-command
+  ;;  (concat "xdg-open \"logseq://graph/Logseq_notes?" title-or-id "\";" "xdotool search --name \"" (shell-quote-argument (frame-parameter nil 'name))
+  ;;          "\" windowactivate %1"))
+  )
+
+(defun org-logseq-open-external-by-uuid (block-id)
+  "Open logseq by BLOCK-ID."
+  (org-logseq-open-external (concat "block-id=" block-id)))
+
+(defun org-logseq-get-link-at-point ()
+  "Return (type link) at current point."
+  (or (org-logseq-get-block-ref-from-overlay)
+      (org-logseq-get-link)
+      (org-logseq-get-block-id)))
+
+(defun org-logseq-create-new-page (title-name)
+    "Create a new org file in pages directory according to TITLE-NAME."
+    (let ((page-name
+           (expand-file-name (concat
+                              "pages/" (string-replace "/" "___" title-name) ".org")
+                             org-logseq-dir)))
+      (if (y-or-n-p (format "The file \"%s\" doesn't exist, create it or not?" page-name))
+          (progn
+            (find-file-other-window page-name)
+            (org-logseq-set-begin-value "title" title-name))
+        (message (format "The file \"%s\" doesn't exist." page-name)))))
 
 ;;;###autoload
-(defun org-logseq-open-link ()
-  "Open link at point. Supports url, id and page.
-or Block Ref or Embed overlays."
+(defun org-logseq-evil-close-fold ()
+  "Set the heading's collapsed property to true after close fold."
   (interactive)
-  (when-let* ((t-l (or (org-logseq-get-block-ref-or-embed-link)
-                       (org-logseq-get-link)
-                       (org-logseq-get-block-id))))
-    (let ((type (car t-l))
-          (link (cdr t-l)))
+  (evil-close-fold)
+  (org-set-property "collapsed" "true"))
+
+;;;###autoload
+(defun org-logseq-evil-open-fold ()
+  "Set the heading's collapsed property to false after open fold."
+  (interactive)
+  (org-show-children)
+  (org-set-property "collapsed" "false"))
+
+;;;###autoload
+(defun org-logseq-evil-close-folds ()
+  "Close all folds by 'evil-close-folds', and set the first level's collapsed property to ture."
+  (interactive)
+  (evil-close-folds)
+  (org-map-entries '(org-set-property "collapsed" "true") "LEVEL=1"))
+
+;;;###autoload
+(defun org-logseq-open-external-by-title (&optional title)
+  "Open logseq page by current buffer's #+title or TITLE."
+  (interactive)
+  ;; TODO handel the situation that there is no page named title.
+  (if (not (when-let ((title (or title (org-logseq-get-begin-value "title")))
+                      (title-link (concat "page=" title)))
+             (org-logseq-open-external title-link)))
+      (message "There is not #+TITLE or #+title property in current buffer.")))
+
+;;;###autoload
+;; TODO intergate with org-logseq-open-link
+(defun org-logseq-open-external-at-point ()
+  "Open logseq page by block-id."
+  (interactive)
+  (message
+   (catch 'exit
+     (let (type-link type link)
+       ;; https://codegolf.stackexchange.com/a/66501
+       (save-window-excursion
+         (while (or (setq type-link (org-logseq-get-link-at-point))
+                    (org-up-heading-or-point-min))
+           (if type-link
+               (progn
+                 (setq type (car type-link))
+                 (setq link (cdr type-link))
+                 (pcase type
+                   ('url
+                    (browse-url link)
+                    (throw 'exit "Open url."))
+                   ('page (org-logseq-open-external-by-title link)
+                          (throw 'exit "Open page according to current block or it's parent's block."))
+                   (_ (org-logseq-open-external-by-uuid link)
+                      (throw 'exit "Open block-id at current block or it's parent's block")
+                      ))))))
+       (org-logseq-open-external-by-title)
+       (throw 'exit "Open current page")))))
+
+;;;###autoload
+(defun org-logseq-update-selected-file-timestamp ()
+  "Update logseq files last-update-time property."
+  (interactive)
+  (save-buffer)
+  (save-excursion
+    (set-buffer logseq-current-buffer)
+    (org-logseq-set-begin-value "last-update-time" (current-time-string))
+    (save-buffer)))
+
+;;;###autoload
+(defun org-logseq-select-current-buffer ()
+  "Set logseq-current-bufer to current buffer."
+  (interactive)
+  (setq logseq-current-buffer (current-buffer))
+  (message "logseq-current-buffer set to %s" (buffer-name)))
+
+;;;###autoload
+(defun org-logseq-set-title ()
+  "Set the #+title property according to current logseq buffer filename."
+  (interactive)
+  (let ((title (org-get-title)) file-name)
+    (if title
+        (message "The #+title property already exists")
+      (progn
+        (setq file-name (file-name-base (buffer-file-name)))
+        (if (string-match (rx string-start (group (= 4 digit)) "_" (group (= 2 digit))
+                              "_" (group (= 2 digit)) string-end)
+                          file-name)
+            (progn
+              (let* ((year (string-to-number (match-string 1 file-name)))
+                     (month (string-to-number (match-string 2 file-name)))
+                     (day (string-to-number (match-string 3 file-name)))
+                     (day-of-week
+                      (nth (org-day-of-week day month year)
+                           '("Sun" "Mon" "Tue" "Wed" "Thu" "Fri" "Sat"))))
+                (setq title (format "%s, %s/%s/%s" day-of-week year month day))
+                (message (format "Current buffer is a journal file, set the title to %s" title))))
+          (progn
+            (setq title (string-replace "___" "/" file-name))
+            (message (format "Current buffer is a page file, set the title to %s" title))))
+        (org-logseq-set-begin-value "title" title)))))
+
+;;;###autoload
+(defun org-logseq-open-at-point-inside ()
+  "Open link at point in Emacs or browser, supports url, id, page."
+  (interactive)
+  (when-let ((type-link (org-logseq-get-link-at-point)))
+    (let ((type (car type-link))
+          (link (cdr type-link)))
       (pcase type
         ('url (browse-url link))
-        ('draw (org-logseq-open-excalidraw link))
-        (_ (let ((result (shell-command-to-string
-                          (org-logseq-grep-query t-l))))
-             (when (string-prefix-p "grep" result)
-               (error "grep searching error"))
-             (if (string= result "")
-                 (org-logseq-new-page link)
-               (let* ((f-n (split-string result ":" nil))
-                      (fname (car f-n))
-                      (lineno (string-to-number (cadr f-n))))
-                 (org-open-file fname t lineno)))))))))
-
-(defun org-logseq-new-page (page)
-  "Create a new PAGE org file in pages directory if setting
- `org-logseq-new-page-p' to non-nil."
-  (if org-logseq-new-page-p
-      (find-file-other-window
-       (expand-file-name (concat "pages/" page) github-dir))
-    (user-error "No page found; Check `org-logseq-new-page-p` variable")))
-
-;; todo: looking for a way to open draw file by post
-(defun org-logseq-open-excalidraw nil)
-
-(defvar org-logseq-excalidraw
-  "{
-  \"type\": \"excalidraw\",
-  \"version\": 2,
-  \"source\": \"https://excalidraw.com\",
-  \"elements\": [],
-  \"appState\": {
-    \"gridSize\": null,
-    \"viewBackgroundColor\": \"#ffffff\"
-  }
-}"
-  "Blank excalidraw file")
-
-(defun org-logseq-new-excalidraw (&optional name)
-  "Create an excalidraw file and insert it at point."
-  (interactive "P")
-  (let ((excalidraw-fname (format "%s.excalidraw"
-                                  (or name (format-time-string "%Y-%m-%d_%H_%M_%S")))))
-    (insert (format "[[draws/%s]]" excalidraw-fname))
-    (with-current-buffer
-        (find-file-noselect
-         (expand-file-name (format "draws/%s" excalidraw-fname)
-                           org-logseq-dir))
-      (insert org-logseq-excalidraw)
-      (save-buffer))))
-
-;;; Contents sidebar
-(defcustom org-logseq-sidebar-width 30
-  "Sidebar window width")
-
-(defcustom org-logseq-sidebar-side 'left
-  "Sidebar position")
+        ('page (org-logseq-open-page-inside link))
+        (_ (org-logseq-goto-id link))))))
 
 ;;;###autoload
-(defun org-logseq-toggle-contents-sidebar ()
-  "Display contents.org as sidebar left side."
+(defun org-logseq-open-at-point-external ()
+  "Open link at point in Logseq or browser, suports url, id, page."
   (interactive)
-  (if-let ((contents-window
-            (--first
-             (and (string= "contents.org" (buffer-name (window-buffer it)))
-                  (window-dedicated-p it))
-             (window-list (selected-frame)))))
-      (delete-window contents-window)
-    (let ((window-parameters (list (cons 'no-other-window t)
-                                   (cons 'no-delete-other-windows t))))
-      (display-buffer-in-side-window
-       (find-file-noselect (expand-file-name "pages/contents.org" org-logseq-dir))
-       (list (cons 'side org-logseq-sidebar-side)
-             (cons 'window-width org-logseq-sidebar-width)
-             (cons 'window-parameters window-parameters))))))
+  (when-let ((type-link (org-logseq-get-link-at-point)))
+    (let ((type (car type-link))
+          (link (cdr type-link)))
+      (pcase type
+        ('url (browse-url link))
+        ('page (org-logseq-open-external-by-title link))
+        (_ (org-logseq-open-external-by-uuid link))))))
+
+;;;###autoload
+
+;;;###autoload
 
 ;;; Logseq id overlays
-(defvar-local org-logseq-block-ref-overlays nil)
-(defvar-local org-logseq-block-embed-overlays nil)
-(defvar-local org-logseq-buffer-modified-p nil)
 
-(defvar org-logseq-block-ref-re "((\\([a-zA-Z0-9-]+\\)))")
-(defvar org-logseq-block-embed-re "{{embed +((\\([a-zA-Z0-9-]+\\))) *}}")
+;;;###Variable for another functions.
+;; (defvar org-logseq-block-ref-re "((\\([a-zA-Z0-9-]+\\)))")
+(defvar org-logseq-block-ref-re
+  (rx "((" (group (= 8 alnum) "-"
+                  (= 3 (= 4 alnum) "-")
+                  (= 12 alnum)) "))"))
 
-(defface org-logseq-ref-block
-  '((((class color) (min-colors 88) (background light))
-     :background "#fff3da" :extend t)
-    (((class color) (min-colors 88) (background dark))
-     :background "#fff3da" :extend t))
-  "Face for ref block."
-  :group 'org-logseq)
+(defun org-logseq-replace-todo (heading)
+  "If HEADING start with TODO DO DONE, replace them."
+  (while (string-match (rx word-start (| "TODO" "DOING" "DONE" "CANCELED") word-end " ") heading)
+    (setq heading
+          (concat (substring heading nil (match-beginning 0))
+                  (substring heading (match-end 0) nil))))
+  heading)
 
-(defface org-logseq-embed-block
-  '((((class color) (min-colors 88) (background light))
-     :background "#f3f3ff" :extend t)
-    (((class color) (min-colors 88) (background dark))
-     :background "#f3f3ff" :extend t))
-  "Face for embed block."
-  :group 'org-logseq)
-
-;;;###autoload
-(defun org-logseq-toggle-block-ref-overlays ()
-  (interactive)
-  (if org-logseq-block-ref-overlays
-      (org-logseq-block-ref-deactivate)
-    (org-logseq-block-ref-activate)))
-
-;;;###autoload
-(defun org-logseq-toggle-block-embed-overlays ()
-  (interactive)
-  (if org-logseq-block-embed-overlays
-      (org-logseq-block-embed-deactivate)
-    (org-logseq-block-embed-activate)))
-
-(defun org-logseq--make-block-ref-overlays ()
-  (org-logseq-make-block-overlays 'ref))
-(defun org-logseq--remove-block-ref-overlays ()
-  (org-logseq-remove-block-overlays 'ref))
-
-(defun org-logseq-block-ref-activate ()
-  (org-logseq--make-block-ref-overlays)
-  (add-hook 'before-save-hook #'org-logseq--remove-block-ref-overlays nil t)
-  (add-hook 'after-save-hook #'org-logseq--make-block-ref-overlays nil t)
-  (add-hook 'kill-buffer-hook #'org-logseq--remove-block-ref-overlays nil t))
-(defun org-logseq-block-ref-deactivate ()
-  (org-logseq--remove-block-ref-overlays)
-  (remove-hook 'before-save-hook #'org-logseq--remove-block-ref-overlays t)
-  (remove-hook 'after-save-hook #'org-logseq--make-block-ref-overlays t)
-  (remove-hook 'kill-buffer-hook #'org-logseq--make-block-ref-overlays t))
-
-(add-hook 'org-mode-hook
-          #'(lambda () (when org-logseq-block-ref-overlay-p
-                         (org-logseq-block-ref-activate))))
-
-(defun org-logseq--make-block-embed-overlays ()
-  (org-logseq-make-block-overlays 'embed))
-(defun org-logseq--remove-block-embed-overlays ()
-  (org-logseq-remove-block-overlays 'embed))
-
-(defun org-logseq-block-embed-activate ()
-  (org-logseq--make-block-embed-overlays)
-  (add-hook 'before-save-hook #'org-logseq--remove-block-embed-overlays nil t)
-  (add-hook 'after-save-hook #'org-logseq--make-block-embed-overlays nil t))
-(defun org-logseq-block-embed-deactivate ()
-  (org-logseq--remove-block-embed-overlays)
-  (remove-hook 'before-save-hook #'org-logseq--remove-block-embed-overlays t)
-  (remove-hook 'after-save-hook #'org-logseq--make-block-embed-overlays t))
-
-(add-hook 'org-mode-hook
-          #'(lambda () (when org-logseq-block-embed-overlay-p
-                         (org-logseq-block-embed-activate))))
-
-(defun org-logseq-make-block-overlays (type &optional beg end)
-  (setq org-logseq-buffer-modified-p (buffer-modified-p))
-  (save-excursion
-    (goto-char (or beg (point-min)))
-    (let ((re (pcase type
-                ('ref org-logseq-block-ref-re)
-                ('embed org-logseq-block-embed-re))))
-      (while (and (re-search-forward re end t)
-                  (pcase type
-                    ('ref (not (looking-at " *}}")))
-                    ('embed t)))
-        (let* ((uuid (match-string-no-properties 1))
-               (tuuid (cons 'id uuid))
-               (overlay-end (point))
-               (overlay-beg (re-search-backward
-                             (pcase type ('ref "((") ('embed "{{"))
-                             (line-beginning-position) t))
-               (file-type-block (org-logseq-get-block-content tuuid type)))
-          (org-logseq-create-block-overlay overlay-beg overlay-end file-type-block)))))
-  (set-buffer-modified-p org-logseq-buffer-modified-p))
-
-(defun org-logseq-prepare-embed-content (content)
-  (let ((content-list (split-string content "\n"))
-        headline-spaces line-spaces)
-    (concat "​" (mapconcat
-                #'(lambda (str)
-                    (if (string-match "\\(\*+\\)" str)
-                        (progn
-                          (setq line-spaces (make-string (* (length (match-string 1 str)) 2) ? ))
-                          (setq headline-spaces (make-string (* (1- (length (match-string 1 str))) 2) ? ))
-                          (setq heading
-                                (concat headline-spaces (replace-match "\*" nil nil str 1))))
-                      (concat line-spaces str)))
-                content-list "\n")
-            "\n")))
-
-(defun org-logseq-hide-block-embed-drawer-all (beg end)
-  "Fold all drawers in the block embed overlays."
-  (save-excursion
-    (goto-char beg)
-    (while (re-search-forward org-drawer-regexp end t)
-      (let* ((pair (get-char-property-and-overlay (line-beginning-position)
-						                          'invisible))
-	         (o (cdr-safe pair)))
-	    (if (overlayp o) (goto-char (overlay-end o)) ;invisible drawer
-	      (pcase (get-char-property-and-overlay (point) 'invisible)
-	        (`(outline . ,o) (goto-char (overlay-end o))) ;already folded
-	        (_
-	         (let* ((drawer (org-element-at-point))
-		            (type (org-element-type drawer)))
-	           (when (memq type '(drawer property-drawer))
-		         (org-hide-drawer-toggle t nil drawer)
-		         ;; Make sure to skip drawer entirely or we might flag it
-		         ;; another time when matching its ending line with
-		         ;; `org-drawer-regexp'.
-		         (goto-char end))))))))))
-
-(defun org-logseq-create-block-overlay (beg end file-type-block)
-  (pcase-let ((`((,file . ,uuid) . (,type . ,content))
-               file-type-block))
-    (delete-region beg end)
-    (insert (pcase type
-              ('ref content)
-              ('embed (org-logseq-prepare-embed-content content))))
-    (let* ((end (point))
-           (ov (make-overlay beg end))
-           (face (pcase type
-                   ('ref 'org-logseq-ref-block)
-                   ('embed 'org-logseq-embed-block))))
-      (overlay-put ov 'parent 'block)
-      (overlay-put ov 'type type)
-      (overlay-put ov 'evaporate t)
-      (overlay-put ov 'file file)
-      (overlay-put ov 'block-uuid uuid)
-      (overlay-put ov 'target content)
-      (overlay-put ov 'help-echo
-                   (format "Original page: %s.org" (file-name-base file)))
-      (overlay-put ov 'face face)
-      ;; (overlay-put ov 'keymap org-logseq-overlay-map)
-      (add-text-properties beg end '(read-only t))
-      (org-logseq-hide-block-embed-drawer-all beg end)
-      (pcase type
-        ('ref (push ov org-logseq-block-ref-overlays))
-        ('embed (push ov org-logseq-block-embed-overlays))))))
-
-(defvar org-logseq-overlay-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map "RET" 'org-logseq-open-link)
-    map))
-
-(defun org-logseq-get-block-content (tuuid type)
-  (when-let ((to-marker (point-marker))
-             (result (shell-command-to-string
-                      (org-logseq-grep-query tuuid))))
-    (let* ((f-n (split-string result ":" nil))
-           (file (car f-n))
-           (line (string-to-number (cadr f-n))))
-      (cons (cons file (cdr tuuid))
-            (with-current-buffer (find-file-noselect file)
-              (goto-line line)
-              (cons type
-                    (pcase type
-                      ('ref (format "[[id:%s][%s]]" (cdr tuuid)
-                                    (let ((result (org-no-properties (org-get-heading))))
-                                      (dolist (func org-logseq-block-ref-heading-hook) 
-                                        (setq result (funcall func result)))
-                                      result)))
-                      ('embed 
-                       (save-restriction
-                         (org-narrow-to-subtree)
-                         (buffer-substring-no-properties (point-min) (point-max)))))))))))
-
-(defun olih-link (heading)
-  (if (string-match "\\[\\[.+\\]\\[\\(.+\\)\\]\\]" heading)
-      (match-string 1 heading)
-    heading))
+(defun org-logseq-replace-link (heading)
+  "If HEADING contain [[link][title],  only show title."
+  (while (string-match "\\[\\[.+\\]\\[\\(.+\\)\\]\\]" heading)
+    (setq heading
+          (concat (substring heading nil (match-beginning 0))
+                  "🌐"
+                  (match-string 1 heading)
+                  (substring heading (match-end 0) nil))))
+  heading)
 
 (defcustom org-logseq-block-ref-heading-hook
-  '(olih-link)
-  "Hook for cleaning up id heading")
+  '(org-logseq-replace-link org-logseq-replace-block-ref org-logseq-replace-todo)
+  "Hook for cleaning up id heading.")
 
-(defun org-logseq-remove-block-overlays (type)
-  (setq org-logseq-buffer-modified-p (buffer-modified-p))
-  (when-let ((overlays (pcase type
-                         ('ref org-logseq-block-ref-overlays)
-                         ('embed org-logseq-block-embed-overlays))))
+
+(defun org-logseq-make-block-ref-overlays ()
+  "Insert ovelays at ref."
+  (interactive)
+  ;; (ov-clear)
+  (let (ov uuid begin end heading-text)
     (save-excursion
-      (dolist (ov overlays)
-        (let* ((beg (overlay-start ov))
-               (end (overlay-end ov))
-               (block-uuid (overlay-get ov 'block-uuid))
-               (file (overlay-get ov 'file))
-               (inhibit-read-only t))
-          (remove-text-properties beg end '(read-only t))
-          (delete-region beg end)
-          (delete-overlay ov)
-          (goto-char beg)
-          (insert (pcase type
-                    ('ref (concat "((" block-uuid "))"))
-                    ('embed (format "{{embed  ((%s))}}" block-uuid))))))
-      (pcase type
-        ('ref (setq org-logseq-block-ref-overlays nil))
-        ('embed (setq org-logseq-block-embed-overlays nil)))))
-  (set-buffer-modified-p org-logseq-buffer-modified-p))
+      (goto-char (point-min))
+      (while (re-search-forward org-logseq-block-ref-re nil t)
+        (setq uuid (match-string 1))
+        (setq begin (match-beginning 0))
+        (setq end (match-end 0))
+        (if (and (is-uuid uuid)
+                 (not (ov-in begin end)))
+            (progn
+              (setq ov (ov-make  begin end))
+              (setq heading-text (org-logseq-get-block-ref-content uuid))
+              (ov-set ov
+                      'category 'block-ref
+                      'display heading-text
+                      'prev-display heading-text
+                      'block-uuid uuid
+                      'evaporate t
+                      ;; 'target heading-text
+                      'face 'org-inline-src-block
+                      'front-sticky t
+                      'rear-sticky t
+                      'cursor-sensor-functions (list #'org-logseq-ov-cursor-sensor))
+              ;; (ov-placeholder ov)
+              ))))))
 
-(defun org-logseq-return (&optional indent arg interactive)
-  "Goto next table row or insert a newline.
+(defun org-logseq-ov-cursor-sensor (window position state)
+  "Change the display of overlay at POSITION in WINDOW accordint to the STATE."
+  (message "new-in")
+  (setq disable-point-adjustment t)
+  (let (( ov (ov-at
+              (pcase state
+                ('entered nil)
+                ('left position)
+                )
+              )))
+    (if (and ov (eq (ov-val ov 'category) 'block-ref))
+        (pcase state
+          ('entered
+           (ov-set ov 'display nil)
+           (goto-char (- (ov-end ov) 3))
+           )
+          ('left
+           (save-excursion (ov-set ov 'display (org-logseq-get-block-ref-content (ov-val ov 'block-uuid))))
+           )))))
 
-Calls `org-table-next-row' or `newline', depending on context.
+(defun org-logseq-get-block-ref-content (uuid)
+  "Return the content of the given UUID."
+  (when-let ((file-name (org-logseq-find-id-file uuid)))
+    (save-window-excursion
+      (with-current-buffer (find-file-noselect file-name)
+        (org-id-goto uuid)
+        (let ((result (org-no-properties (org-get-heading))))
+          (dolist (func org-logseq-block-ref-heading-hook)
+            (setq result (funcall func result)))
+          result)))))
 
-When optional INDENT argument is non-nil, call
-`newline-and-indent' with ARG, otherwise call `newline' with ARG
-and INTERACTIVE.
+(defun org-logseq-replace-block-ref (heading)
+  "If HEADING contain ((uuid)), replace it with the heading text."
+    (while (string-match org-logseq-block-ref-re heading)
+      (let ((uuid (match-string 1 heading))
+            (end (match-end 0)))
+        (if (is-uuid uuid)
+          (setq heading
+                (concat (substring heading nil (match-beginning 0))
+                        (org-logseq-get-block-ref-content uuid)
+                        (substring heading end nil)
+                        )))))
+  heading)
 
-When `org-return-follows-link' is non-nil and point is on
-a timestamp or a link, call `org-open-at-point'.  However, it
-will not happen if point is in a table or on a \"dead\"
-object (e.g., within a comment).  In these case, you need to use
-`org-open-at-point' directly."
-  (interactive "i\nP\np")
-  (let ((context (if org-return-follows-link (org-element-context)
-		           (org-element-at-point))))
-    (cond
-     ;; In a table, call `org-table-next-row'.  However, before first
-     ;; column or after last one, split the table.
-     ((or (and (eq 'table (org-element-type context))
-	           (not (eq 'table.el (org-element-property :type context)))
-	           (>= (point) (org-element-property :contents-begin context))
-	           (< (point) (org-element-property :contents-end context)))
-	      (org-element-lineage context '(table-row table-cell) t))
-      (if (or (looking-at-p "[ \t]*$")
-	          (save-excursion (skip-chars-backward " \t") (bolp)))
-	      (insert "\n")
-	    (org-table-justify-field-maybe)
-	    (call-interactively #'org-table-next-row)))
-     ;; On a link or a timestamp, call `org-open-at-point' if
-     ;; `org-return-follows-link' allows it.  Tolerate fuzzy
-     ;; locations, e.g., in a comment, as `org-open-at-point'.
-     ((and org-return-follows-link
-           (or (and (eq 'link (org-element-type context))
-		            ;; Ensure point is not on the white spaces after
-		            ;; the link.
-		            (let ((origin (point)))
-		              (org-with-point-at (org-element-property :end context)
-			            (skip-chars-backward " \t")
-			            (> (point) origin))))
-	           (org-in-regexp org-ts-regexp-both nil t)
-	           (org-in-regexp org-tsr-regexp-both nil  t)
-	           (org-in-regexp org-link-any-re nil t)
-               (org-logseq-get-block-id)
-               (org-logseq-get-block-ref-or-embed-link)))
-      (org-logseq-open-link))
-     ;; Insert newline in heading, but preserve tags.
-     ((and (not (bolp))
-	       (let ((case-fold-search nil))
-	         (org-match-line org-complex-heading-regexp)))
-      ;; At headline.  Split line.  However, if point is on keyword,
-      ;; priority cookie or tags, do not break any of them: add
-      ;; a newline after the headline instead.
-      (let ((tags-column (and (match-beginning 5)
-			                  (save-excursion (goto-char (match-beginning 5))
-					                          (current-column))))
-	        (string
-	         (when (and (match-end 4) (org-point-in-group (point) 4))
-	           (delete-and-extract-region (point) (match-end 4)))))
-	    ;; Adjust tag alignment.
-	    (cond
-	     ((not (and tags-column string)))
-	     (org-auto-align-tags (org-align-tags))
-	     (t (org--align-tags-here tags-column))) ;preserve tags column
-	    (end-of-line)
-	    (org-show-entry)
-	    (org--newline indent arg interactive)
-	    (when string (save-excursion (insert (org-trim string))))))
-     ;; In a list, make sure indenting keeps trailing text within.
-     ((and (not (eolp))
-	       (org-element-lineage context '(item)))
-      (let ((trailing-data
-	         (delete-and-extract-region (point) (line-end-position))))
-	    (org--newline indent arg interactive)
-	    (save-excursion (insert trailing-data))))
-     (t
-      ;; Do not auto-fill when point is in an Org property drawer.
-      (let ((auto-fill-function (and (not (org-at-property-p))
-				                     auto-fill-function)))
-	    (org--newline indent arg interactive))))))
+
+;; (defvar org-logseq-overlay-map
+;;   (let ((map (make-sparse-keymap)))
+;;     (define-key map "RET" 'org-logseq-open-link)
+;;     map))
 
 (defun org-logseq-activate ()
-  (advice-add 'org-return :override #'org-logseq-return)
-  (advice-add 'org-open-at-point :override #'org-logseq-open-link)
-  (advice-add 'org-open-at-mouse :override #'org-logseq-open-link))
+  "Override the default open behavior of org."
+  (advice-add 'org-open-at-point :override #'org-logseq-open-at-point-inside)
+  (advice-add 'org-open-at-mouse :override #'org-logseq-open-at-point-inside))
 
 (defun org-logseq-deactivate ()
-  (advice-remove 'org-return #'org-logseq-return)
-  (advice-remove 'org-open-at-point #'org-logseq-open-link)
-  (advice-remove 'org-open-at-mouse #'org-logseq-open-link))
+  "Restore the default open behavior of org."
+  (advice-remove 'org-open-at-point #'org-logseq-open-at-point-inside)
+  (advice-remove 'org-open-at-mouse #'org-logseq-open-at-point-inside))
 
-(defvar org-logseq-map
+(defvar org-logseq-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [remap org-return] 'org-logseq-return)
-    (define-key map [remap org-open-at-point] 'org-logseq-open-link)
-    (define-key map [remap org-open-at-mouse] 'org-logseq-open-link)
+    (define-key map [remap org-open-at-point] 'org-logseq-open-at-point-inside)
+    (define-key map [remap org-open-at-mouse] 'org-logseq-open-at-point-inside)
     map)
-  "Org-logseq map")
+  "'org-logseq-mode' map.")
 
 (define-minor-mode org-logseq-mode
-  "Org-logseq minor mode"
+  "Org-logseq minor mode."
   :init-value nil
   :global nil
-  :keymap org-logseq-map)
+  :keymap org-logseq-mode-map
+  (cursor-sensor-mode t)
+  (add-hook 'org-logseq-mode-hook
+            #'(lambda ()
+                (add-hook 'after-save-hook 'org-logseq-make-block-ref-overlays nil 'make-it-local)))
+  )
 
-;; (if org-logseq-mode
-;;     (org-logseq-activate)
-;;   (org-logseq-deactivate))
 
-;;;###autoload
-(defun org-logseq-download-images ()
-  (interactive)
-  (save-excursion
-    (goto-char (point-min))
-    (while (re-search-forward "https://cdn.logseq.com" nil t)
-      (let* ((context (org-element-context)))
-        (when (eq (car context) 'link)
-          (let ((link-begin (org-element-property :begin context))
-                (link-end (org-element-property :end context))
-                (path (org-element-property :raw-link context))
-                (image-path (concat "images/"
-                                    (make-temp-name "org-logseq-") (format-time-string "-%Y%m%d.png"))))
-            (start-process "org logseq" nil "curl" path "--output" image-path)
-            (setf (buffer-substring link-begin link-end) (format "[[./%s]]" image-path))))))))
+(evil-define-key 'normal org-logseq-mode-map (kbd "zc") 'org-logseq-evil-close-fold)
+(evil-define-key 'normal org-logseq-mode-map (kbd "zo") 'org-logseq-evil-open-fold)
+
+(if org-logseq-mode
+    (org-logseq-activate)
+  (org-logseq-deactivate))
 
 (provide 'org-logseq)
 ;;; org-logseq.el ends here
