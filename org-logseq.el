@@ -28,9 +28,6 @@
 
 (require 'ol)
 (require 'org-element)
-;; TODO require not found problem
-(require 'evil)
-(require 'ov)
 
 (defgroup org-logseq nil
   "Logseq capbility in Org Mode."
@@ -375,10 +372,9 @@ In order to use this function, you need to manually open logseq in advance."
                   (substring heading (match-end 0) nil))))
   heading)
 
-(defcustom org-logseq-block-ref-heading-hook
-  '(org-logseq-replace-link org-logseq-replace-block-ref org-logseq-replace-todo)
-  "Hook for cleaning up id heading.")
-
+;; (defcustom org-logseq-block-ref-heading-hook
+;;   '(org-logseq-replace-link org-logseq-replace-block-ref org-logseq-replace-todo)
+;;   "Hook for cleaning up id heading.")
 
 (defun org-logseq-make-block-ref-overlays ()
   "Insert ovelays at ref."
@@ -437,7 +433,9 @@ In order to use this function, you need to manually open logseq in advance."
       (with-current-buffer (find-file-noselect file-name)
         (org-id-goto uuid)
         (let ((result (org-no-properties (org-get-heading))))
-          (dolist (func org-logseq-block-ref-heading-hook)
+          (dolist (func  '(org-logseq-replace-link
+                           org-logseq-replace-block-ref
+                           org-logseq-replace-todo))
             (setq result (funcall func result)))
           result)))))
 
@@ -483,18 +481,12 @@ In order to use this function, you need to manually open logseq in advance."
   :global nil
   :keymap org-logseq-mode-map
   (cursor-sensor-mode t)
-  (add-hook 'org-logseq-mode-hook
-            #'(lambda ()
-                (add-hook 'after-save-hook 'org-logseq-make-block-ref-overlays nil 'make-it-local)))
   )
 
-
-(evil-define-key 'normal org-logseq-mode-map (kbd "zc") 'org-logseq-evil-close-fold)
-(evil-define-key 'normal org-logseq-mode-map (kbd "zo") 'org-logseq-evil-open-fold)
-
-(if org-logseq-mode
-    (org-logseq-activate)
-  (org-logseq-deactivate))
-
+;; (add-hook 'org-logseq-mode-hook
+;;             #'(lambda ()
+;;                 (add-hook 'after-save-hook 'org-logseq-make-block-ref-overlays nil 'make-it-local)))
+;; (evil-define-key 'normal org-logseq-mode-map (kbd "zc") 'org-logseq-evil-close-fold)
+;; (evil-define-key 'normal org-logseq-mode-map (kbd "zo") 'org-logseq-evil-open-fold)
 (provide 'org-logseq)
 ;;; org-logseq.el ends here
