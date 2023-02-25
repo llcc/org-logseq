@@ -117,8 +117,8 @@ if the FILE-NAME is current buffer, jump to the line."
 
 (defun org-logseq-get-block-ref-from-overlay ()
   "Return \"('id . uuid)\" if point is a overlay created by org-logseq."
-  (when-let ((ov (ov-at (point)))
-             (create-by-org-logseq-flag (eq (ov-val ov 'parent) 'block)))
+  (when-let ((ov (ov-at))
+             (create-by-org-logseq-flag (eq (ov-val ov 'category) 'block-ref)))
     (cons 'overlay (ov-val ov 'block-uuid))))
 
 (defun org-logseq-get-file-name-from-title (title-name)
@@ -199,9 +199,11 @@ In order to use this function, you need to manually open logseq in advance."
 
 (defun org-logseq-get-link-at-point ()
   "Return (type link) at current point."
-  (or (org-logseq-get-block-ref-from-overlay)
-      (org-logseq-get-link)
-      (org-logseq-get-block-id)))
+  (or
+   (org-logseq-get-block-ref-from-overlay)
+   (org-logseq-get-link)
+   (org-logseq-get-block-id)
+   ))
 
 (defun org-logseq-create-new-page (title-name)
     "Create a new org file in pages directory according to TITLE-NAME."
@@ -255,7 +257,7 @@ In order to use this function, you need to manually open logseq in advance."
    (catch 'exit
      (let (type-link type link)
        ;; https://codegolf.stackexchange.com/a/66501
-       (save-window-excursion
+       (save-excursion
          (while (or (setq type-link (org-logseq-get-link-at-point))
                     (org-up-heading-or-point-min))
            (if type-link
@@ -270,9 +272,9 @@ In order to use this function, you need to manually open logseq in advance."
                           (throw 'exit "Open page according to current block or it's parent's block."))
                    (_ (org-logseq-open-external-by-uuid link)
                       (throw 'exit "Open block-id at current block or it's parent's block")
-                      ))))))
-       (org-logseq-open-external-by-title)
-       (throw 'exit "Open current page")))))
+                      )))))
+         (org-logseq-open-external-by-title)
+         (throw 'exit "Open current page in logseq."))))))
 
 ;;;###autoload
 (defun org-logseq-update-selected-file-timestamp ()
@@ -372,10 +374,6 @@ In order to use this function, you need to manually open logseq in advance."
                   (substring heading (match-end 0) nil))))
   heading)
 
-;; (defcustom org-logseq-block-ref-heading-hook
-;;   '(org-logseq-replace-link org-logseq-replace-block-ref org-logseq-replace-todo)
-;;   "Hook for cleaning up id heading.")
-
 (defun org-logseq-make-block-ref-overlays ()
   "Insert ovelays at ref."
   (interactive)
@@ -406,9 +404,8 @@ In order to use this function, you need to manually open logseq in advance."
               ;; (ov-placeholder ov)
               ))))))
 
-(defun org-logseq-ov-cursor-sensor (window position state)
+(defun org-logseq-ov-cursor-sensor (_window position state)
   "Change the display of overlay at POSITION in WINDOW accordint to the STATE."
-  (message "new-in")
   (setq disable-point-adjustment t)
   (let (( ov (ov-at
               (pcase state
@@ -421,6 +418,7 @@ In order to use this function, you need to manually open logseq in advance."
           ('entered
            (ov-set ov 'display nil)
            (goto-char (- (ov-end ov) 3))
+           (message "%S" (org-logseq-find-id-file (ov-val ov 'block-uuid)))
            )
           ('left
            (save-excursion (ov-set ov 'display (org-logseq-get-block-ref-content (ov-val ov 'block-uuid))))
