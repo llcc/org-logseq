@@ -1,0 +1,75 @@
+
+org-logseq.el,4756
+(defgroup org-logseq nilorg-logseq32,1009
+(defcustom org-logseq-dir nilorg-logseq-dir36,1084
+(defcustom org-logseq-new-page-p nilorg-logseq-new-page-p40,1163
+(defcustom org-logseq-block-ref-overlay-p nilorg-logseq-block-ref-overlay-p44,1271
+(defcustom org-logseq-block-embed-overlay-p nilorg-logseq-block-embed-overlay-p49,1451
+(defun org-logseq-grep-query (page-or-id)org-logseq-grep-query56,1649
+(defun org-logseq-open-file-at-line-number (file-name line-number)org-logseq-open-file-at-line-number66,2162
+(defun org-logseq-copy-create-id ()org-logseq-copy-create-id79,2645
+(defun org-logseq-copy-ids-from-region ()org-logseq-copy-ids-from-region88,2910
+(defun org-logseq-copy-ids-from-parents ()org-logseq-copy-ids-from-parents108,3474
+(defun org-logseq-copy-ids-from-region-with-parents ()org-logseq-copy-ids-from-region-with-parents128,4018
+(defun is-uuid (s)is-uuid141,4317
+(defun org-logseq-get-begin-value (key)org-logseq-get-begin-value145,4631
+(defun org-logseq-set-begin-value (key value)org-logseq-set-begin-value149,4751
+(defun org-logseq-get-block-id ()org-logseq-get-block-id160,5217
+(defun org-logseq-get-link ()org-logseq-get-link169,5617
+(defun org-logseq-get-block-ref-from-overlay ()org-logseq-get-block-ref-from-overlay179,6039
+(defun org-logseq-get-file-name-from-title (title-name)org-logseq-get-file-name-from-title185,6313
+(defun org-logseq-open-page-inside (title)org-logseq-open-page-inside198,7018
+(defun org-logseq-update-id-locations ()org-logseq-update-id-locations213,7749
+(defun org-logseq-find-id-file (id)org-logseq-find-id-file221,8049
+(defun org-logseq-goto-id (id)org-logseq-goto-id235,8564
+(defun org-logseq-open-external (title-or-id)org-logseq-open-external244,8836
+(defun org-logseq-open-external-by-uuid (block-id)org-logseq-open-external-by-uuid258,9509
+(defun org-logseq-get-link-at-point ()org-logseq-get-link-at-point262,9650
+(defun org-logseq-create-new-page (title-name)org-logseq-create-new-page270,9840
+(defun org-logseq-evil-close-fold ()org-logseq-evil-close-fold283,10454
+(defun org-logseq-evil-open-fold ()org-logseq-evil-open-fold291,10683
+(defun org-logseq-evil-close-folds ()org-logseq-evil-close-folds299,10914
+(defun org-logseq-open-external-by-title (&optional title)org-logseq-open-external-by-title306,11172
+(defun org-logseq-open-external-at-point ()org-logseq-open-external-at-point317,11702
+(defun org-logseq-update-selected-file-timestamp ()org-logseq-update-selected-file-timestamp344,12799
+(defun org-logseq-select-current-buffer ()org-logseq-select-current-buffer354,13101
+(defun org-logseq-set-title ()org-logseq-set-title361,13333
+(defun org-logseq-open-at-point-inside ()org-logseq-open-at-point-inside387,14662
+(defun org-logseq-open-at-point-external ()org-logseq-open-at-point-external399,15072
+(defvar org-logseq-block-ref-reorg-logseq-block-ref-re418,15645
+(defun org-logseq-replace-todo (heading)org-logseq-replace-todo423,15791
+(defun org-logseq-replace-link (heading)org-logseq-replace-link431,16135
+(defun org-logseq-make-block-ref-overlays ()org-logseq-make-block-ref-overlays441,16515
+(defun org-logseq-ov-cursor-sensor (_window position state)org-logseq-ov-cursor-sensor471,17645
+(defun org-logseq-get-block-ref-content (uuid)org-logseq-get-block-ref-content494,18478
+(defun org-logseq-replace-block-ref (heading)org-logseq-replace-block-ref507,19030
+(defun org-logseq-surround (char)org-logseq-surround525,19599
+(defun org-logseq-send-keys (key)org-logseq-send-keys537,20054
+(defun org-logseq-page-up ()org-logseq-page-up542,20320
+(defun org-logseq-page-down ()org-logseq-page-down547,20438
+(defvar org-logseq-bonus-time 0)org-logseq-bonus-time558,20717
+(defvar org-logseq-pomodoro-time 0)org-logseq-pomodoro-time559,20750
+(defvar org-logseq-time-reorg-logseq-time-re560,20786
+(defvar org-logseq-habits '("nofap" "nogame" "novideo"))org-logseq-habits564,20920
+(defvar org-logseq-habit-bonus-timeorg-logseq-habit-bonus-time565,20977
+(defvar org-logseq-habit-punish-timeorg-logseq-habit-punish-time572,21086
+(defun org-logseq-minutes-to-string (minutes)org-logseq-minutes-to-string580,21197
+(defun org-logseq-get-minutes-from-string (time-string)org-logseq-get-minutes-from-string591,21610
+(defun org-logseq-update-bonus-time ()org-logseq-update-bonus-time598,21944
+(defun org-logseq-update-pomodoro ()org-logseq-update-pomodoro666,24454
+(defun org-logseq-update-total-time ()org-logseq-update-total-time680,24966
+(defun org-logseq-activate ()org-logseq-activate690,25244
+(defun org-logseq-deactivate ()org-logseq-deactivate695,25479
+(defvar org-logseq-mode-maporg-logseq-mode-map700,25701
+(define-minor-mode org-logseq-modeorg-logseq-mode707,25963
+
+README.org,340
+* FeaturesFeatures5,214
+* InstallationInstallation19,939
+* Getting startedGetting started39,1907
+* CustomizationCustomization51,2321
+- *org-logseq-block-ref-overlay-p* ::::55,2517
+- *org-logseq-block-embed-overlay-p* ::::57,2685
+* ChangelogChangelog61,2854
+** <2021-04-08 Thu><2021-04-08 Thu>63,2867
+* ThanksThanks67,3077

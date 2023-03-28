@@ -1,9 +1,9 @@
 ;;; org-logseq.el --- for logseq  -*- lexical-binding: t; -*-
 
-;; Author: Zhe Lei <lzhes43@gmail.com>
-;; URL: https://github.com/llcc/org-logseq
-;; Package-Version: 20210402.2237
-;; Version: 0.0.4
+;; Author: Lijunjie <lijunjie199502@gmail.com>
+;; URL: https://github.com/sbwcwso/org-logseq
+;; Package-Version: 20230228.2339
+;; Version: 0.0.5
 ;; Package-Requires: ((dash "2.11.0") (org "9.0.0"))
 
 
@@ -75,6 +75,67 @@ if the FILE-NAME is current buffer, jump to the line."
     (org-open-file file-name t line-number))
   (evil-close-fold)
   (org-fold-show-children))
+
+(defun org-logseq-copy-create-id ()
+  "Copy id at current point with (()) around it, if id does not exist, create a new one."
+  (interactive)
+  (let ((id (org-id-get-create)) res)
+    (setq res (format "((%s))" id))
+    (kill-new res)
+    (my-pclip res)
+    res))
+
+(defun org-logseq-copy-ids-from-region ()
+  "Copy ids from region."
+  (interactive)
+  (save-excursion
+    (let ((start (region-beginning))
+          (end (region-end))
+          (headings '())
+          res)
+      (goto-char start)
+      (org-next-visible-heading 0)
+      (while (< (point) end)
+        (push (concat
+         (make-string (org-outline-level) ?*) " "
+         (org-logseq-copy-create-id)) headings)
+        (org-next-visible-heading 1))
+      (setq res (string-join (reverse headings) "\n"))
+      (message res)
+      (kill-new res)
+      res)))
+
+(defun org-logseq-copy-ids-from-parents ()
+  "Copy ids from the parent title."
+  (interactive)
+  (save-excursion
+    (save-excursion (let ((headings '())
+          res)
+      (if (region-active-p)
+          (goto-char (region-beginning))
+          (deactivate-mark)
+          )
+      (while (org-up-heading-safe)
+        (push (concat
+         (make-string (org-outline-level) ?*) " "
+         (org-logseq-copy-create-id)) headings)
+        )
+      (setq res (string-join headings "\n"))
+      (message res)
+      (kill-new res)
+      res))))
+
+(defun org-logseq-copy-ids-from-region-with-parents ()
+  "Copy ids from region with the parent's id."
+  (interactive)
+  (let ((res
+         (concat (org-logseq-copy-ids-from-parents) "\n"
+                 (org-logseq-copy-ids-from-region))))
+    (message res)
+    (kill-new res)
+    res
+    )
+  )
 
 
 (defun is-uuid (s)
@@ -151,6 +212,7 @@ if the FILE-NAME is current buffer, jump to the line."
 
 (defun org-logseq-update-id-locations ()
   "Update id locations in logseq directories."
+  (interactive)
   (org-id-update-id-locations
    (append
     (directory-files (expand-file-name "journals" org-logseq-dir) t ".*org")
@@ -222,14 +284,16 @@ In order to use this function, you need to manually open logseq in advance."
   "Set the heading's collapsed property to true after close fold."
   (interactive)
   (evil-close-fold)
-  (org-set-property "collapsed" "true"))
+  (org-set-property "collapsed" "true")
+  (org-cycle-hide-drawers 'all))
 
 ;;;###autoload
 (defun org-logseq-evil-open-fold ()
   "Set the heading's collapsed property to false after open fold."
   (interactive)
   (org-show-children)
-  (org-set-property "collapsed" "false"))
+  (org-set-property "collapsed" "false")
+  (org-cycle-hide-drawers 'all))
 
 ;;;###autoload
 (defun org-logseq-evil-close-folds ()
@@ -417,6 +481,9 @@ In order to use this function, you need to manually open logseq in advance."
         (pcase state
           ('entered
            (ov-set ov 'display nil)
+           ;; (set-mark (ov-end ov))
+           ;; (goto-char (ov-beg ov))
+           ;; (activate-mark)
            (goto-char (- (ov-end ov) 3))
            (message "%S" (org-logseq-find-id-file (ov-val ov 'block-uuid)))
            )
@@ -450,11 +517,187 @@ In order to use this function, you need to manually open logseq in advance."
                         )))))
   heading)
 
+;;;; Personal use
+
+
+;; xdotools send keys.
+
+(defun org-logseq-surround (char)
+  "Wrap of 'evil-surround-region' with CHAR argument, ignore the inline code."
+  (save-excursion
+    (let* ((start (region-beginning))
+          (pos (region-end)))
+      (goto-char pos)
+      (while (re-search-backward " =.*= " start t)
+        (evil-surround-region (match-end 0) pos 'line char)
+        (setq pos (match-beginning 0)))
+      (if (> pos start)
+          (evil-surround-region start pos 'line char)))))
+
+(defun org-logseq-send-keys (key)
+  "Send KEY to the logseq window."
+  (shell-command (format  "currentwindow=$(xdotool getwindowfocus);xdotool windowactivate --sync $(xdotool search --class logseq|tail -1); xdotool key %s;xdotool windowactivate $currentwindow" key))
+  )
+
+(defun org-logseq-page-up ()
+  "Send Page_Up key to the logseq."
+  (interactive)
+  (org-logseq-send-keys "Page_Up"))
+
+(defun org-logseq-page-down ()
+  "Send Page_Up key to the logseq."
+  (interactive)
+  (org-logseq-send-keys "Page_Down"))
+
+(defun org-logseq-home ()
+  "Send home key to the logseq."
+  (interactive)
+  (org-logseq-send-keys "Home"))
+
+(defun org-logseq-end ()
+  "Send End key to the logseq."
+  (interactive)
+  (org-logseq-send-keys "End"))
 
 ;; (defvar org-logseq-overlay-map
 ;;   (let ((map (make-sparse-keymap)))
 ;;     (define-key map "RET" 'org-logseq-open-link)
 ;;     map))
+
+;;;; Time-related
+
+(defvar org-logseq-bonus-time 0)
+(defvar org-logseq-pomodoro-time 0)
+(defvar org-logseq-time-re
+  (rx (+ (| (group-n 3 (group-n 1 (+ digit)) "h" (? " ")) (group-n 4 (group-n 2 (+ digit)) "min")))
+   ))
+
+(defvar org-logseq-habits '("nofap" "nogame" "novideo"))
+(defvar org-logseq-habit-bonus-time
+  '(
+    ("nofap" . 10)
+    ("nogame" . 10)
+    ("novideo" . 10)
+    ))
+
+(defvar org-logseq-habit-punish-time
+  '(
+    ("nofap" . 60)
+    ("nogame" . 60)
+    ("novideo" . 60)
+    ))
+
+
+(defun org-logseq-minutes-to-string (minutes)
+  "Convert MINUTES to hour minute format."
+  (let* ((sign (if (> minutes 0) 1 -1))
+         (minutes (abs minutes))
+         (hours (/ minutes 60))
+         (minutes (- minutes (* 60 hours))))
+    (format "%s%s%s"
+            (if (= sign -1) "-" "")
+            (if (> hours 0) (format "%dh " hours) "")
+            (if (> minutes 0) (format "%dmin" minutes) ""))))
+
+(defun org-logseq-get-minutes-from-string (time-string)
+  "Get minutes for TIME-STRING(Like 2h 5min)."
+  (string-match org-logseq-time-re time-string)
+  (let ((hours   (string-to-number (or (match-string 1 time-string) "0")))
+        (minutes (string-to-number (or (match-string 2 time-string) "0"))))
+    (+ minutes (* 60 hours))))
+
+(defun org-logseq-update-bonus-time ()
+  "Update logseq journal bonus time."
+  (interactive)
+  (setq org-logseq-bonus-time 0)
+  (org-map-entries
+   '(progn
+      (let ((punish-time (org-entry-get (point) ".punish"))
+            (bonus-time (org-entry-get (point) ".bonus")))
+
+        (if punish-time
+            (progn
+              (org-entry-delete (point) ".punish")
+              (org-entry-put (point) "punish" punish-time)))
+        (if bonus-time
+            (progn
+              (org-entry-delete (point) ".bonus")
+              (org-entry-put (point) "bonus" bonus-time)))
+        )
+      ) "TODO=\"TODO\"")
+
+  (org-map-entries
+   '(progn
+      (let ((punish-time (org-entry-get (point) "punish"))
+            (bonus-time (or (org-entry-get (point) ".bonus")
+                             (org-entry-get (point) "bonus"))))
+
+        (if punish-time
+            (progn
+              (org-entry-delete (point) "punish")
+              (org-entry-put (point) ".punish" punish-time)))
+        (if bonus-time
+            (progn
+              (setq org-logseq-bonus-time (+ org-logseq-bonus-time (string-to-number bonus-time)))
+              (org-entry-delete (point) ".bonus")
+              (org-entry-put (point) "bonus" bonus-time)))
+        )
+      ) "TODO=\"DONE\"")
+
+  (org-map-entries
+   '(progn
+      (let ((punish-time  (or (org-entry-get (point) ".punish")
+                              (org-entry-get (point) "punish")))
+            (bonus-time (org-entry-get (point) "bonus")))
+
+        (if punish-time
+            (progn
+              (setq org-logseq-bonus-time (+ org-logseq-bonus-time (string-to-number punish-time)))
+              (org-entry-delete (point) ".punish")
+              (org-entry-put (point) "punish" punish-time)))
+        (if bonus-time
+            (progn
+              (org-entry-delete (point) "bonus")
+              (org-entry-put (point) ".bonus" bonus-time)))
+        )
+      ) "TODO=\"CANCELLED\"")
+
+  (dolist (habit org-logseq-habits)
+    (if (string-equal (org-logseq-get-begin-value habit) "😭")
+        (setq org-logseq-bonus-time
+              (- org-logseq-bonus-time
+                 (cdr (assoc habit org-logseq-habit-punish-time))))
+      (if (string-equal (org-logseq-get-begin-value habit) "😃")
+          (setq org-logseq-bonus-time
+                (+ org-logseq-bonus-time
+                   (cdr (assoc habit org-logseq-habit-bonus-time))))))
+    )
+  (org-logseq-set-begin-value "bonus_time" (org-logseq-minutes-to-string org-logseq-bonus-time)))
+
+
+(defun org-logseq-update-pomodoro ()
+  "Update journal's pomodoro time."
+  (interactive)
+  (setq org-logseq-pomodoro-time 0)
+  (org-map-entries
+   '(progn
+      (let ((time-string (org-entry-get (point) "pomodoro")))
+        (setq org-logseq-pomodoro-time
+              (+ org-logseq-pomodoro-time (org-logseq-get-minutes-from-string time-string)))
+        ))
+   (concat "pomodoro={" org-logseq-time-re "}"))
+  (org-logseq-set-begin-value "pomodoro" (org-logseq-minutes-to-string org-logseq-pomodoro-time))
+  )
+
+(defun org-logseq-update-total-time ()
+  "Update the total time."
+  (interactive)
+  (org-logseq-update-bonus-time)
+  (org-logseq-update-pomodoro)
+  (org-logseq-set-begin-value
+   "total"
+   (org-logseq-minutes-to-string (+ org-logseq-bonus-time org-logseq-pomodoro-time)))
+  )
 
 (defun org-logseq-activate ()
   "Override the default open behavior of org."
