@@ -97,7 +97,7 @@ if the FILE-NAME is current buffer, jump to the line."
       (org-next-visible-heading 0)
       (while (< (point) end)
         (push (concat
-         (make-string (org-outline-level) ?*) " "
+         (make-string (+ (org-outline-level) 2) ?*) " "
          (org-logseq-copy-create-id)) headings)
         (org-next-visible-heading 1))
       (setq res (string-join (reverse headings) "\n"))
@@ -117,7 +117,7 @@ if the FILE-NAME is current buffer, jump to the line."
           )
       (while (org-up-heading-safe)
         (push (concat
-         (make-string (org-outline-level) ?*) " "
+         (make-string (+ (org-outline-level) 2) ?*) " "
          (org-logseq-copy-create-id)) headings)
         )
       (setq res (string-join headings "\n"))
@@ -198,8 +198,8 @@ if the FILE-NAME is current buffer, jump to the line."
 (defun org-logseq-open-page-inside (title)
   "Open logseq by TITLE inside Emacs."
   (let (file-name)
-    (if (string-match (rx string-start (= 3 alpha) ", " (group (= 4 digit)) "/"
-                          (group (= 2 digit)) "/" (group (= 2 digit)) string-end) title)
+    (if (string-match (rx string-start (group (= 4 digit)) "-"
+                          (group (= 2 digit)) "-" (group (= 2 digit)) " " (or "Sunday" "Monday" "Tuesday" "Wednesday" "Thursday" "Friday" "Saturday") string-end) title)
         (setq file-name (concat "journals/" (match-string 1 title) "_"
                                 (match-string 2 title) "_" (match-string 3 title)
                                 ".org"))
@@ -292,7 +292,7 @@ In order to use this function, you need to manually open logseq in advance."
   "Set the heading's collapsed property to false after open fold."
   (interactive)
   (org-show-children)
-  (org-set-property "collapsed" "false")
+  (org-delete-property "collapsed")
   (org-cycle-hide-drawers 'all))
 
 ;;;###autoload
@@ -311,6 +311,16 @@ In order to use this function, you need to manually open logseq in advance."
                       (title-link (concat "page=" title)))
              (org-logseq-open-external title-link)))
       (message "There is not #+TITLE or #+title property in current buffer.")))
+
+;;;###autoload
+(defun org-logseq-open-current-block-external ()
+  "Open current block external.
+If there is not uuid of current block, send a message."
+  (interactive)
+  (let ((uuid (org-id-get)))
+    (if uuid
+        (org-logseq-open-external-by-uuid uuid)
+      (message "There is no uuid of current block!"))))
 
 ;;;###autoload
 ;; TODO intergate with org-logseq-open-link
@@ -339,6 +349,13 @@ In order to use this function, you need to manually open logseq in advance."
                       )))))
          (org-logseq-open-external-by-title)
          (throw 'exit "Open current page in logseq."))))))
+
+(defun org-logseq-update-file-timestamp ()
+  "Update current buffer's last-update-time property."
+  (interactive)
+    (org-logseq-set-begin-value "last-update-time" (current-time-string))
+    (save-buffer)
+)
 
 ;;;###autoload
 (defun org-logseq-update-selected-file-timestamp ()
@@ -375,8 +392,8 @@ In order to use this function, you need to manually open logseq in advance."
                      (day (string-to-number (match-string 3 file-name)))
                      (day-of-week
                       (nth (org-day-of-week day month year)
-                           '("Sun" "Mon" "Tue" "Wed" "Thu" "Fri" "Sat"))))
-                (setq title (format "%s, %s/%s/%s" day-of-week year month day))
+                           '("Sunday" "Monday" "Tuesday" "Wednesday" "Thursday" "Friday" "Saturday"))))
+                (setq title (format "%04d-%02d-%02d %s" year month day day-of-week))
                 (message (format "Current buffer is a journal file, set the title to %s" title))))
           (progn
             (setq title (string-replace "___" "/" file-name))
@@ -697,6 +714,32 @@ In order to use this function, you need to manually open logseq in advance."
   (org-logseq-set-begin-value
    "total"
    (org-logseq-minutes-to-string (+ org-logseq-bonus-time org-logseq-pomodoro-time)))
+  )
+
+(defun org-logseq-coallapsed-by-properties ()
+  "Coallapsed head by the collapsed properties at point."
+  (save-excursion
+    (if (string-equal "true" (org-entry-get (point) "collapsed"))
+        (org-logseq-evil-close-fold)
+      (org-logseq-evil-open-fold))
+    )
+  )
+
+(defun org-logseq-same-line-p (point1 point2)
+  "Check if POINT1 and POINT2 are on the same line."
+  (eq (line-number-at-pos point1) (line-number-at-pos point2)))
+
+(defun org-logseq-update-collapsed-state ()
+  "Update the whole collapsed state in current buffer."
+  (interactive)
+  (save-excursion
+    (let ((old-point (point-max)))
+      (goto-char (point-min))
+      (while (not (org-logseq-same-line-p (point) old-point))
+        (if (org-at-heading-p)
+            (org-logseq-coallapsed-by-properties))
+        (org-next-visible-heading 1)
+        )))
   )
 
 (defun org-logseq-activate ()
