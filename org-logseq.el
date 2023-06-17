@@ -247,9 +247,13 @@ But not change the keyboard focus.
 In order to use this function, you need to manually open logseq in advance."
   (shell-command
    (concat "xdg-open \"logseq://graph/Logseq_notes?" title-or-id "\""))
+  ;; (shell-command-to-string "xdotool getwindowfocus")
+  ;; (shell-command (format "currentwindow=$(xdotool getwindowfocus);xdg-open 'logseq://graph/Logseq_notes?%s';xdotool windowactivate $currentwindow" title-or-id))
   (shell-command
    (concat "xdotool search --name \"" (shell-quote-argument (frame-parameter nil 'name))
            "\" windowactivate %1"))
+   ;; (format "xdotool search --name '%s' windowactivate %%1" (frame-parameter nil 'name))
+           ;; )
   ;; (call-process-shell-command
   ;;  (concat "xdg-open \"logseq://graph/Logseq_notes?" title-or-id "\";" "xdotool search --name \"" (shell-quote-argument (frame-parameter nil 'name))
   ;;          "\" windowactivate %1"))
@@ -307,6 +311,7 @@ In order to use this function, you need to manually open logseq in advance."
   "Open logseq page by current buffer's #+title or TITLE."
   (interactive)
   ;; TODO handel the situation that there is no page named title.
+  (org-logseq-set-title)
   (if (not (when-let ((title (or title (org-logseq-get-begin-value "title")))
                       (title-link (concat "page=" title)))
              (org-logseq-open-external title-link)))
@@ -545,8 +550,9 @@ If there is not uuid of current block, send a message."
     (let* ((start (region-beginning))
           (pos (region-end)))
       (goto-char pos)
-      (while (re-search-backward " =.*= " start t)
-        (evil-surround-region (match-end 0) pos 'line char)
+      (while (re-search-backward " =.*=[,.]? ?" start t)
+        (if (> pos (match-end 0))
+            (evil-surround-region (match-end 0) pos 'line char))
         (setq pos (match-beginning 0)))
       (if (> pos start)
           (evil-surround-region start pos 'line char)))))
