@@ -552,10 +552,10 @@ If there is not uuid of current block, send a message."
       (goto-char pos)
       (while (re-search-backward " =.*=[,.]? ?" start t)
         (if (> pos (match-end 0))
-            (evil-surround-region (match-end 0) pos 'line char))
+            (evil-surround-region (match-end 0) pos 'block char))
         (setq pos (match-beginning 0)))
       (if (> pos start)
-          (evil-surround-region start pos 'line char)))))
+          (evil-surround-region start pos 'block char)))))
 
 (defun org-logseq-send-keys (key)
   "Send KEY to the logseq window."
