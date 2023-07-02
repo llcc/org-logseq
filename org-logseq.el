@@ -184,8 +184,8 @@ if the FILE-NAME is current buffer, jump to the line."
 
 (defun org-logseq-get-file-name-from-title (title-name)
   "Return file name with path by the TITLE-NAME."
-  (if (string-match (rx string-start (= 3 alpha) ", " (group (= 4 digit)) "/"
-                        (group (= 2 digit)) "/" (group (= 2 digit)) string-end) title-name)
+  (if (string-match (rx string-start (group (= 4 digit)) "-"
+                        (group (= 2 digit)) "-" (group (= 2 digit)) string-end) title-name)
       (expand-file-name (concat "journals/"
                                 (match-string 1 title-name) "_"
                                 (match-string 2 title-name) "_"
@@ -747,6 +747,18 @@ If there is not uuid of current block, send a message."
         (org-next-visible-heading 1)
         )))
   )
+
+
+(defun org-logseq-switch-to-today ()
+    "Switch to today's journal.
+If today's journal does not exists, switch to yesterday's journal."
+    (interactive)
+    (let ((today-journal-name (org-logseq-get-file-name-from-title (format-time-string "%Y-%m-%d"))))
+      (if (not (file-exists-p today-journal-name))
+          (shell-command "diary_template.py -w")
+        (find-file today-journal-name)
+        )))
+
 
 (defun org-logseq-activate ()
   "Override the default open behavior of org."
