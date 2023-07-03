@@ -82,7 +82,7 @@ if the FILE-NAME is current buffer, jump to the line."
   (let ((id (org-id-get-create)) res)
     (setq res (format "((%s))" id))
     (kill-new res)
-    (my-pclip res)
+    ;; (xclip res)  # TODO make sure this works
     res))
 
 (defun org-logseq-copy-ids-from-region ()
@@ -755,9 +755,8 @@ If today's journal does not exists, switch to yesterday's journal."
     (interactive)
     (let ((today-journal-name (org-logseq-get-file-name-from-title (format-time-string "%Y-%m-%d"))))
       (if (not (file-exists-p today-journal-name))
-          (shell-command "diary_template.py -w")
-        (find-file today-journal-name)
-        )))
+          (shell-command "~/.dotfiles/scripts/python/diary_template.py -w"))
+      (find-file today-journal-name)))
 
 
 (defun org-logseq-activate ()
