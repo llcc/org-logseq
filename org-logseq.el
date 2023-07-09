@@ -85,6 +85,16 @@ if the FILE-NAME is current buffer, jump to the line."
     ;; (xclip res)  # TODO make sure this works
     res))
 
+(defun org-logseq-set-heading-id ()
+  "Set heading according to the level of current point and create id."
+  (interactive)
+  (let ((head-level (org-outline-level)))
+    (org-set-property "heading" (number-to-string head-level))
+    (org-id-get-create)
+    (org-cycle-hide-drawers 'all)
+    )
+  )
+
 (defun org-logseq-copy-ids-from-region ()
   "Copy ids from region."
   (interactive)
