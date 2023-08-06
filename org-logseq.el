@@ -732,6 +732,16 @@ If there is not uuid of current block, send a message."
    (org-logseq-minutes-to-string (+ org-logseq-bonus-time org-logseq-pomodoro-time)))
   )
 
+(defun org-logseq-set-pomodoro-time (hour minute)
+  "Update pomodoro time at point."
+  (interactive
+   (list (read-number "Hour: " 0) 
+         (read-number "Minute: " 35)))
+  (org-entry-put (point) "pomodoro" (format "%dh %dmin" hour minute))
+  (org-todo "DONE")
+  (org-logseq-update-total-time)
+  )
+
 (defun org-logseq-coallapsed-by-properties ()
   "Coallapsed head by the collapsed properties at point."
   (save-excursion
