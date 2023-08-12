@@ -568,7 +568,7 @@ If there is not uuid of current block, send a message."
 
 (defun org-logseq-send-keys (key)
   "Send KEY to the logseq window."
-  (shell-command (format  "currentwindow=$(xdotool getwindowfocus);xdotool windowactivate --sync $(xdotool search --class logseq|grep -vF \"$(xdotool search --name '\.pdf')\"|tail -1); xdotool key %s;xdotool windowactivate $currentwindow" key))
+  (shell-command (format  "currentwindow=$(xdotool getwindowfocus);xdotool windowactivate --sync $(xdotool search --class logseq|grep -vF $(xdotool search --name '\\\.pdf' || echo '\"\"')|tail -1); xdotool key %s;xdotool windowactivate $currentwindow" key))
   )
 
 (defun org-logseq-page-up ()
