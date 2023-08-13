@@ -368,7 +368,6 @@ If there is not uuid of current block, send a message."
   "Update current buffer's last-update-time property."
   (interactive)
     (org-logseq-set-begin-value "last-update-time" (current-time-string))
-    (save-buffer)
 )
 
 ;;;###autoload
