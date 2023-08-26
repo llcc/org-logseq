@@ -744,10 +744,16 @@ If there is not uuid of current block, send a message."
   "Coallapsed head by the collapsed properties at point."
   (save-excursion
     (if (string-equal "true" (org-entry-get (point) "collapsed"))
-        (org-logseq-evil-close-fold)
-      (org-logseq-evil-open-fold))
+        (progn
+          (evil-close-fold)
+          (org-cycle-hide-drawers 'all)
+          )
+      (progn
+        (org-show-children)
+        (org-cycle-hide-drawers 'all)
+        )
     )
-  )
+  ))
 
 (defun org-logseq-same-line-p (point1 point2)
   "Check if POINT1 and POINT2 are on the same line."
