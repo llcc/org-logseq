@@ -83,7 +83,7 @@ The type can be 'url, 'draw and 'page, denoting the link type."
     (format (pcase type
               ('page "grep -niR \"^#+\\(TITLE\\|ALIAS\\): *%s\" %s --exclude-dir=.git" )
               ('id "grep -niR \":id: *%s\" %s --exclude-dir=.git"))
-            query (shell-quote-argument org-logseq-dir))))
+            query (shell-quote-argument (f-expand org-logseq-dir)))))
 
 (defun org-logseq-get-block-ref-or-embed-link ()
   (when-let ((ovs (overlays-at (point)))
